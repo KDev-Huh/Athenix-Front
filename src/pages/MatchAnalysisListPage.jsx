@@ -1,6 +1,8 @@
 import React from 'react'
 import { deleteMatch, getMatches, setCurrentMatchId, updateMatchStatus } from '../lib/appStorage'
 
+const BLOCKED_STATUSES = ['처리중', '처리 실패']
+
 export function MatchAnalysisListPage({ onNavigate }) {
   const PAGE_SIZE = 10
   const statusOptions = ['임시 저장', '분석 중', '분석 완료']
@@ -41,7 +43,8 @@ export function MatchAnalysisListPage({ onNavigate }) {
 
   const getStatusClassName = React.useCallback((status) => {
     if (status === '임시 저장') return 'status-pill status-pill--draft'
-    if (status === '분석 중') return 'status-pill status-pill--processing'
+    if (status === '분석 중' || status === '처리중') return 'status-pill status-pill--processing'
+    if (status === '처리 실패') return 'status-pill status-pill--error'
     return 'status-pill status-pill--complete'
   }, [])
 
@@ -83,12 +86,18 @@ export function MatchAnalysisListPage({ onNavigate }) {
     }
   }, [deletingMatchId])
 
-  const handleCardKeyDown = React.useCallback((event) => {
+  const handleCardClick = React.useCallback((card) => {
+    if (BLOCKED_STATUSES.includes(card.status)) return
+    setCurrentMatchId(card.id)
+    onNavigate('analysis')
+  }, [onNavigate])
+
+  const handleCardKeyDown = React.useCallback((event, card) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      onNavigate('analysis')
+      handleCardClick(card)
     }
-  }, [onNavigate])
+  }, [handleCardClick])
 
   return (
     <div className="list-page">
@@ -129,17 +138,16 @@ export function MatchAnalysisListPage({ onNavigate }) {
       <div className="list-stack">
         {isLoading ? <p className="list-loading">목록을 불러오는 중입니다...</p> : null}
         {!isLoading && cards.length === 0 ? <p className="list-empty">조건에 맞는 경기가 없습니다.</p> : null}
-        {cards.map((card) => (
+        {cards.map((card) => {
+          const isBlocked = BLOCKED_STATUSES.includes(card.status)
+          return (
           <article
             key={card.id}
-            className="list-card"
-            onKeyDown={handleCardKeyDown}
-            onClick={() => {
-              setCurrentMatchId(card.id)
-              onNavigate('analysis')
-            }}
+            className={`list-card${isBlocked ? ' is-blocked' : ''}`}
+            onKeyDown={(event) => handleCardKeyDown(event, card)}
+            onClick={() => handleCardClick(card)}
             role="button"
-            tabIndex={0}
+            tabIndex={isBlocked ? -1 : 0}
           >
             {card.thumbnailUrl ? (
               <img alt={`${card.title} 썸네일`} className="list-card__thumb list-card__thumb--image" src={card.thumbnailUrl} />
@@ -155,6 +163,7 @@ export function MatchAnalysisListPage({ onNavigate }) {
               <div className="status-control">
                 <button
                   className={getStatusClassName(card.status)}
+                  disabled={isBlocked}
                   onClick={(event) => handleStatusToggle(event, card.id)}
                   type="button"
                 >
@@ -185,7 +194,8 @@ export function MatchAnalysisListPage({ onNavigate }) {
               </button>
             </div>
           </article>
-        ))}
+          )
+        })}
       </div>
       <div className="list-pagination">
         <button

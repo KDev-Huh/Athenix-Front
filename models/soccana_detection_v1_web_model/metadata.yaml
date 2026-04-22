@@ -1,0 +1,23 @@
+description: Ultralytics soccana_detection_v1 model trained on ../../data/processed/detection_Soccana/V1/data.yaml
+author: Ultralytics
+date: '2026-04-21T08:50:54.842005'
+version: 8.4.40
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: Player
+  1: Ball
+  2: Referee
+args:
+  batch: 1
+  half: false
+  int8: false
+  nms: false
+channels: 3
+end2end: false

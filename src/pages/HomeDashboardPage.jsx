@@ -32,8 +32,11 @@ export function HomeDashboardPage({ onNavigate }) {
     }
   }, [])
 
-  const openMatchAnalysis = React.useCallback((matchId) => {
-    setCurrentMatchId(matchId)
+  const BLOCKED_STATUSES = ['처리중', '처리 실패']
+
+  const openMatchAnalysis = React.useCallback((match) => {
+    if (BLOCKED_STATUSES.includes(match.status)) return
+    setCurrentMatchId(match.id)
     clearHighlightedMemoId()
     onNavigate('analysis')
   }, [onNavigate])
@@ -58,13 +61,22 @@ export function HomeDashboardPage({ onNavigate }) {
       <section className="dashboard-section">
         <h2>최근 분석 경기</h2>
         <div className="card-row">
-          {recentMatches.map((match) => (
-            <div className="mini-card" key={match.id} onClick={() => openMatchAnalysis(match.id)} role="button" tabIndex={0}>
+          {recentMatches.map((match) => {
+            const isBlocked = BLOCKED_STATUSES.includes(match.status)
+            return (
+            <div
+              className={`mini-card${isBlocked ? ' is-blocked' : ''}`}
+              key={match.id}
+              onClick={() => openMatchAnalysis(match)}
+              role="button"
+              tabIndex={isBlocked ? -1 : 0}
+            >
               <span>{match.date}</span>
               <strong>{match.title}</strong>
               <p>{match.desc}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
       </section>
 

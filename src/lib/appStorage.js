@@ -67,6 +67,7 @@ async function refreshSession() {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           Authorization: `Bearer ${refreshToken}`,
         },
@@ -103,6 +104,7 @@ async function request(path, { method = 'GET', body, requiresAuth = false, respo
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
+    credentials: 'include',
     headers,
     body: body instanceof FormData ? body : body != null ? JSON.stringify(body) : undefined,
   })
@@ -136,6 +138,7 @@ async function requestMultipartWithProgress(path, formData, { requiresAuth = fal
   const execute = () => new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${API_BASE_URL}${path}`)
+    xhr.withCredentials = true
     xhr.setRequestHeader('Accept', 'application/json')
 
     if (requiresAuth && session?.accessToken) {
@@ -336,6 +339,7 @@ export async function logoutUser() {
   try {
     await fetch(`${API_BASE_URL}/auth/logout`, {
       method: 'POST',
+      credentials: 'include',
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     })
   } catch {
@@ -538,17 +542,9 @@ export async function getTodayTip() {
   return request('/tips/today', { requiresAuth: true })
 }
 
-export async function getPersistentMatchVideoUrl(matchId) {
-  if (matchId == null || matchId === '') return null
-  try {
-    const blob = await request(`/matches/${matchId}/video`, {
-      requiresAuth: true,
-      responseType: 'blob',
-    })
-    return URL.createObjectURL(blob)
-  } catch {
-    return null
-  }
+export function getPersistentMatchVideoUrl(matchId) {
+  if (matchId == null || matchId === '') return Promise.resolve(null)
+  return Promise.resolve(`${API_BASE_URL}/matches/${matchId}/video`)
 }
 
 export function getMatchVideoUrl() {
