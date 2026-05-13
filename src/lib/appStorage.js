@@ -509,7 +509,7 @@ export function clearHighlightedMemoId() {
   localStorage.removeItem(STORAGE_KEYS.highlightedMemoId)
 }
 
-export async function requestAiFeedback(matchId, timeMs, context = '선수 움직임 분석 요청') {
+export async function requestAiFeedback(matchId, timeMs, isRtl = false, context = '선수 움직임 분석 요청') {
   if (matchId == null || matchId === '') {
     throw new Error('AI 분석을 요청할 경기 정보가 없습니다.')
   }
@@ -518,6 +518,7 @@ export async function requestAiFeedback(matchId, timeMs, context = '선수 움�
     method: 'POST',
     body: {
       timeMs: Number.isFinite(timeMs) ? Math.max(0, Math.floor(timeMs)) : 0,
+      isRtl: Boolean(isRtl),
       context,
     },
     requiresAuth: true,

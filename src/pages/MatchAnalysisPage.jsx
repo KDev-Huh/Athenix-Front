@@ -387,6 +387,7 @@ export function MatchAnalysisPage({ onBack }) {
   const [editingMemoText, setEditingMemoText] = React.useState('')
   const [seekHistory, setSeekHistory] = React.useState([])
   const [seekHistoryIndex, setSeekHistoryIndex] = React.useState(-1)
+  const [isRtl, setIsRtl] = React.useState(false)
   const [aiStatus, setAiStatus] = React.useState('대기 중')
   const [lastFeedbackId, setLastFeedbackId] = React.useState(null)
   const [resolvedVideoUrl, setResolvedVideoUrl] = React.useState(null)
@@ -795,7 +796,7 @@ export function MatchAnalysisPage({ onBack }) {
 
     setAiStatus('분석 중')
     try {
-      const feedback = await requestAiFeedback(currentMatch.id, getCurrentVideoTimeMs())
+      const feedback = await requestAiFeedback(currentMatch.id, getCurrentVideoTimeMs(), isRtl)
       setLastFeedbackId(feedback?.feedbackId ?? null)
       const nextArrowGuide = extractArrowGuide(feedback)
       setArrowGuide(nextArrowGuide)
@@ -810,7 +811,7 @@ export function MatchAnalysisPage({ onBack }) {
       setArrowGuide(null)
       setShowArrowOnPause(false)
     }
-  }, [currentMatch?.id, getCurrentVideoTimeMs])
+  }, [currentMatch?.id, getCurrentVideoTimeMs, isRtl])
 
   const handleAppendFeedbackMemo = React.useCallback(async () => {
     if (!currentMatch?.id) return
@@ -1143,6 +1144,25 @@ export function MatchAnalysisPage({ onBack }) {
           <div className="coach-card__notice">
             <strong>AI 분석 안내</strong>
             <p>AI 분석은 "AI 분석 요청"을 눌러야 시작됩니다. 기본 상태는 미분석입니다.</p>
+          </div>
+          <div className="coach-card__direction">
+            <span className="coach-card__direction-label">공격 방향</span>
+            <div className="coach-card__direction-buttons">
+              <button
+                className={`button button--small ${!isRtl ? 'button--primary' : 'button--ghost'}`}
+                onClick={() => setIsRtl(false)}
+                type="button"
+              >
+                → 왼쪽에서 오른쪽
+              </button>
+              <button
+                className={`button button--small ${isRtl ? 'button--primary' : 'button--ghost'}`}
+                onClick={() => setIsRtl(true)}
+                type="button"
+              >
+                ← 오른쪽에서 왼쪽
+              </button>
+            </div>
           </div>
           <button className="button button--primary button--block" onClick={handleAiRequest} type="button">AI 분석 요청</button>
           {hasAiFeedback ? (

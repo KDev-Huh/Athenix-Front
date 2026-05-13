@@ -1704,6 +1704,29 @@ button {
   border-radius: 12px;
 }
 
+.coach-card__direction {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coach-card__direction-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #8a9199);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.coach-card__direction-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.coach-card__direction-buttons .button {
+  flex: 1;
+}
+
 .score-card {
   flex: 1;
 }
