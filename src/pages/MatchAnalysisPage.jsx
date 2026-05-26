@@ -407,6 +407,7 @@ export function MatchAnalysisPage({ onBack }) {
     situation: 'AI 분석 요청 전입니다. 요청 후 현재 상황 분석이 표시됩니다.',
     movement: 'AI 분석 요청 전입니다. 요청 후 추천 플레이가 표시됩니다.',
   })
+  const [errorModal, setErrorModal] = React.useState(null)
 
   const videoRef = React.useRef(null)
   const tfRef = React.useRef(null)
@@ -806,10 +807,11 @@ export function MatchAnalysisPage({ onBack }) {
         movement: feedback?.movement ?? feedback?.playGuide?.message ?? '추천 플레이 결과가 없습니다.',
       })
       setAiStatus('완료')
-    } catch {
+    } catch (error) {
       setAiStatus('대기 중')
       setArrowGuide(null)
       setShowArrowOnPause(false)
+      setErrorModal(error instanceof Error ? error.message : 'AI 분석 요청 중 오류가 발생했습니다.')
     }
   }, [currentMatch?.id, getCurrentVideoTimeMs, isRtl])
 
@@ -923,6 +925,35 @@ export function MatchAnalysisPage({ onBack }) {
 
   return (
     <div className="analysis-layout">
+      {errorModal ? (
+        <div
+          className="error-modal-backdrop"
+          onClick={() => setErrorModal(null)}
+          onKeyDown={(e) => e.key === 'Escape' && setErrorModal(null)}
+          role="presentation"
+        >
+          <div
+            className="error-modal"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="error-modal-title"
+          >
+            <div className="error-modal__header">
+              <span className="status-pill status-pill--error" id="error-modal-title">오류 발생</span>
+            </div>
+            <p className="error-modal__message">{errorModal}</p>
+            <button
+              className="button button--primary button--block"
+              onClick={() => setErrorModal(null)}
+              type="button"
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      ) : null}
       <aside className="analysis-left">
         <button className="button button--ghost button--small" onClick={onBack} type="button">
           ← 뒤로 가기
@@ -967,6 +998,7 @@ export function MatchAnalysisPage({ onBack }) {
                   setVideoPaused(false)
                   setShowArrowOnPause(false)
                 }}
+                onSeeking={() => setShowArrowOnPause(false)}
                 ref={videoRef}
                 src={resolvedVideoUrl}
               />
@@ -1137,6 +1169,12 @@ export function MatchAnalysisPage({ onBack }) {
 
       <aside className="analysis-right">
         <div className="coach-card">
+          {aiStatus === '분석 중' ? (
+            <div className="coach-card__loading-overlay" aria-live="polite">
+              <span className="coach-card__loading-spinner" />
+              <span className="coach-card__loading-label">AI 분석 중...</span>
+            </div>
+          ) : null}
           <div className="coach-card__head">
             <span>AI 코치 피드백</span>
             <div className={aiStatusClass}>{aiStatus}</div>
@@ -1164,7 +1202,14 @@ export function MatchAnalysisPage({ onBack }) {
               </button>
             </div>
           </div>
-          <button className="button button--primary button--block" onClick={handleAiRequest} type="button">AI 분석 요청</button>
+          <button
+            className="button button--primary button--block"
+            disabled={aiStatus === '분석 중'}
+            onClick={handleAiRequest}
+            type="button"
+          >
+            AI 분석 요청
+          </button>
           {hasAiFeedback ? (
             <>
               <article className="coach-section">
