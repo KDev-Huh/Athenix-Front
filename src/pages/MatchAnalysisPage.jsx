@@ -11,6 +11,7 @@ import {
   requestAiFeedback,
   updateMemoText,
 } from '../lib/appStorage'
+import { MatchAnalysisOverlayMode } from './MatchAnalysisOverlayMode'
 
 const DETECTION_MODEL_URL = '/models/soccana_detection_v1_web_model/model.json'
 const DETECTION_INPUT_SIZE = 640
@@ -408,6 +409,7 @@ export function MatchAnalysisPage({ onBack }) {
     movement: 'AI 분석 요청 전입니다. 요청 후 추천 플레이가 표시됩니다.',
   })
   const [errorModal, setErrorModal] = React.useState(null)
+  const [overlayMode, setOverlayMode] = React.useState(false)
 
   const videoRef = React.useRef(null)
   const tfRef = React.useRef(null)
@@ -876,6 +878,14 @@ export function MatchAnalysisPage({ onBack }) {
     setSeekHistoryIndex(nextIndex)
   }, [seekHistory, seekHistoryIndex, seekVideoTo])
 
+  const handleVideoError = React.useCallback(() => setVideoLoadFailed(true), [])
+  const handleVideoPause = React.useCallback(() => setVideoPaused(true), [])
+  const handleVideoPlay = React.useCallback(() => {
+    setVideoPaused(false)
+    setShowArrowOnPause(false)
+  }, [])
+  const handleVideoSeeking = React.useCallback(() => setShowArrowOnPause(false), [])
+
   const aiStatusClass = aiStatus === '완료'
     ? 'status-pill status-pill--complete'
     : aiStatus === '분석 중'
@@ -922,6 +932,63 @@ export function MatchAnalysisPage({ onBack }) {
   const matchInfoText = currentMatch
     ? `${currentMatch.date} · ${currentMatch.teamName || '-'} vs ${currentMatch.opponentName || '-'}`
     : '경기 선택 정보 없음'
+
+  if (overlayMode) {
+    return (
+      <MatchAnalysisOverlayMode
+        aiStatus={aiStatus}
+        ballCount={ballCount}
+        bboxColorKey={bboxColorKey}
+        bboxColorPreset={bboxColorPreset}
+        bboxEnabled={bboxEnabled}
+        bboxMenuOpen={bboxMenuOpen}
+        coachContent={coachContent}
+        detectionCanvasRef={detectionCanvasRef}
+        editingMemoId={editingMemoId}
+        editingMemoText={editingMemoText}
+        errorModal={errorModal}
+        hasAiFeedback={hasAiFeedback}
+        isRtl={isRtl}
+        isVideoReady={isVideoReady}
+        mappedDetections={mappedDetections}
+        matchInfoText={matchInfoText}
+        memoInput={memoInput}
+        memos={memos}
+        onAiRequest={handleAiRequest}
+        onAppendFeedbackMemo={handleAppendFeedbackMemo}
+        onBack={onBack}
+        onDeleteMemo={handleDeleteMemo}
+        onEditCancel={handleEditCancel}
+        onEditSave={handleEditSave}
+        onEditStart={handleEditStart}
+        onExitOverlay={() => setOverlayMode(false)}
+        onMemoCreate={handleMemoCreate}
+        onSelectMemo={handleSelectMemo}
+        onVideoError={handleVideoError}
+        onVideoPause={handleVideoPause}
+        onVideoPlay={handleVideoPlay}
+        onVideoSeeking={handleVideoSeeking}
+        playerCount={playerCount}
+        renderedArrowGuide={renderedArrowGuide}
+        resolvedVideoUrl={resolvedVideoUrl}
+        selectedMemo={selectedMemo}
+        selectedMemoId={selectedMemoId}
+        setBboxColorKey={setBboxColorKey}
+        setBboxEnabled={setBboxEnabled}
+        setBboxMenuOpen={setBboxMenuOpen}
+        setEditingMemoText={setEditingMemoText}
+        setErrorModal={setErrorModal}
+        setIsRtl={setIsRtl}
+        setMemoInput={setMemoInput}
+        shouldShowArrowOverlay={shouldShowArrowOverlay}
+        syncVideoMetrics={syncVideoMetrics}
+        videoPaused={videoPaused}
+        videoLoadFailed={videoLoadFailed}
+        videoMetrics={videoMetrics}
+        videoRef={videoRef}
+      />
+    )
+  }
 
   return (
     <div className="analysis-layout">
@@ -990,15 +1057,12 @@ export function MatchAnalysisPage({ onBack }) {
             {isVideoReady ? (
               <video
                 controls
-                onError={() => setVideoLoadFailed(true)}
+                onError={handleVideoError}
                 onLoadedData={syncVideoMetrics}
                 onLoadedMetadata={syncVideoMetrics}
-                onPause={() => setVideoPaused(true)}
-                onPlay={() => {
-                  setVideoPaused(false)
-                  setShowArrowOnPause(false)
-                }}
-                onSeeking={() => setShowArrowOnPause(false)}
+                onPause={handleVideoPause}
+                onPlay={handleVideoPlay}
+                onSeeking={handleVideoSeeking}
                 ref={videoRef}
                 src={resolvedVideoUrl}
               />
@@ -1121,6 +1185,13 @@ export function MatchAnalysisPage({ onBack }) {
             ← 뒤로 가기
           </button>
           <h1>경기 분석</h1>
+          <button
+            className="overlay-mode-btn"
+            onClick={() => setOverlayMode(true)}
+            type="button"
+          >
+            ⊞ 오버레이 모드
+          </button>
         </div>
 
         <article className="selected-note">
