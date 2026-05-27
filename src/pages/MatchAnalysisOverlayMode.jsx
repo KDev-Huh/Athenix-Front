@@ -276,7 +276,6 @@ export function MatchAnalysisOverlayMode({
         </div>
       )}
 
-      <div className="ov-vignette" aria-hidden="true" />
 
       {playFeedback ? (
         <div className="play-feedback play-feedback--overlay" key={playFeedback.id}>
