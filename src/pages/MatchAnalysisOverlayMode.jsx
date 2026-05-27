@@ -56,6 +56,22 @@ export function MatchAnalysisOverlayMode({
   const [aiOpen, setAiOpen] = React.useState(false)
   const [memoOpacity, setMemoOpacity] = React.useState(1)
   const [aiOpacity, setAiOpacity] = React.useState(1)
+  const [memoZ, setMemoZ] = React.useState(9050)
+  const [aiZ, setAiZ] = React.useState(9050)
+  const [topbarZ, setTopbarZ] = React.useState(30)
+  const zCounterRef = React.useRef(0)
+  const bringMemoToFront = React.useCallback(() => {
+    zCounterRef.current += 1
+    setMemoZ(9050 + zCounterRef.current)
+  }, [])
+  const bringAiToFront = React.useCallback(() => {
+    zCounterRef.current += 1
+    setAiZ(9050 + zCounterRef.current)
+  }, [])
+  const bringBboxToFront = React.useCallback(() => {
+    zCounterRef.current += 1
+    setTopbarZ(9050 + zCounterRef.current)
+  }, [])
   const [videoCurrentTime, setVideoCurrentTime] = React.useState(0)
   const [videoDuration, setVideoDuration] = React.useState(0)
   const [videoVolume, setVideoVolume] = React.useState(1)
@@ -86,6 +102,11 @@ export function MatchAnalysisOverlayMode({
     v.addEventListener('durationchange', onDuration)
     return () => v.removeEventListener('durationchange', onDuration)
   }, [])
+
+  React.useEffect(() => {
+    const id = requestAnimationFrame(() => syncVideoMetrics())
+    return () => cancelAnimationFrame(id)
+  }, [videoFit, syncVideoMetrics])
 
   const handleOvPlayPause = React.useCallback(() => {
     const v = videoRef.current
@@ -336,7 +357,7 @@ export function MatchAnalysisOverlayMode({
       ) : null}
 
 
-      <div className="ov-topbar">
+      <div className="ov-topbar" style={{ zIndex: topbarZ }}>
         <div className="ov-match-pill">
           <button className="ov-match-pill__back" onClick={onBack} type="button">
             <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 16 16" width="14">
@@ -356,11 +377,11 @@ export function MatchAnalysisOverlayMode({
         <div className="ov-topbar__spacer" />
 
         <div className="ov-topbar__cluster">
-          <div className="ov-bbox-wrap">
+          <div className="ov-bbox-wrap" onMouseDown={bringBboxToFront}>
             <button
               className="ov-action-pill"
               data-active={bboxMenuOpen ? 'true' : 'false'}
-              onClick={() => setBboxMenuOpen((p) => !p)}
+              onClick={() => { bringBboxToFront(); setBboxMenuOpen((p) => !p) }}
               type="button"
             >
               <svg fill="none" height="16" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
@@ -455,7 +476,8 @@ export function MatchAnalysisOverlayMode({
 <div
         className="ov-drawer"
         data-open={memoOpen ? 'true' : 'false'}
-        style={{ left: memoPos.x, top: memoPos.y, width: memoSize.w, height: memoSize.h, ...(memoOpen ? { opacity: memoOpacity } : {}) }}
+        onMouseDown={bringMemoToFront}
+        style={{ left: memoPos.x, top: memoPos.y, width: memoSize.w, height: memoSize.h, zIndex: memoZ, ...(memoOpen ? { opacity: memoOpacity } : {}) }}
       >
         <div className="ov-drawer__head" onMouseDown={handleMemoDragStart}>
           <span className="ov-drawer__title">메모</span>
@@ -481,15 +503,15 @@ export function MatchAnalysisOverlayMode({
                 className="ov-memo-card"
                 data-selected={isSelected ? 'true' : 'false'}
                 key={memo.id}
-                onClick={isSelected ? undefined : () => onSelectMemo(memo)}
-                onKeyDown={isSelected ? undefined : (e) => {
+                onClick={() => onSelectMemo(memo)}
+                onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     onSelectMemo(memo)
                   }
                 }}
-                role={isSelected ? undefined : 'button'}
-                tabIndex={isSelected ? undefined : 0}
+                role="button"
+                tabIndex={0}
               >
                 <span className="ov-memo-card__time">{memo.time}</span>
                 {isEditing ? (
@@ -541,7 +563,8 @@ export function MatchAnalysisOverlayMode({
       <div
         className="ov-drawer"
         data-open={aiOpen ? 'true' : 'false'}
-        style={{ left: aiPos.x, top: aiPos.y, width: aiSize.w, height: aiSize.h, ...(aiOpen ? { opacity: aiOpacity } : {}) }}
+        onMouseDown={bringAiToFront}
+        style={{ left: aiPos.x, top: aiPos.y, width: aiSize.w, height: aiSize.h, zIndex: aiZ, ...(aiOpen ? { opacity: aiOpacity } : {}) }}
       >
         <div className="ov-drawer__head" onMouseDown={handleAiDragStart}>
           <span className="ov-drawer__title">AI 코치 피드백</span>

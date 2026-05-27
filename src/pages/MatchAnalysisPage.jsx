@@ -630,7 +630,7 @@ export function MatchAnalysisPage({ onBack }) {
         detectionLoopRef.current = null
       }
     }
-  }, [resolvedVideoUrl, videoLoadFailed, videoPaused, bboxEnabled])
+  }, [resolvedVideoUrl, videoLoadFailed, videoPaused, bboxEnabled, overlayMode])
 
   React.useEffect(() => {
     const videoElement = videoRef.current
@@ -968,12 +968,26 @@ export function MatchAnalysisPage({ onBack }) {
     savedVideoTimeRef.current = videoRef.current?.currentTime || 0
     savedVideoWasPausedRef.current = videoRef.current?.paused ?? true
     setOverlayMode(true)
+    document.documentElement.requestFullscreen?.().catch(() => {})
   }, [])
 
   const exitOverlay = React.useCallback(() => {
     savedVideoTimeRef.current = videoRef.current?.currentTime || 0
     savedVideoWasPausedRef.current = videoRef.current?.paused ?? true
     setOverlayMode(false)
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  }, [])
+
+  React.useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        savedVideoTimeRef.current = videoRef.current?.currentTime || 0
+        savedVideoWasPausedRef.current = videoRef.current?.paused ?? true
+        setOverlayMode(false)
+      }
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
   }, [])
 
   React.useEffect(() => {
