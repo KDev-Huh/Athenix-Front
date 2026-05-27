@@ -51,6 +51,13 @@ const BBOX_COLOR_PRESETS = {
   },
 }
 
+function formatVideoTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function getIoU(boxA, boxB) {
   const xLeft = Math.max(boxA.x1, boxB.x1)
   const yTop = Math.max(boxA.y1, boxB.y1)
@@ -394,7 +401,7 @@ export function MatchAnalysisPage({ onBack }) {
   const [resolvedVideoUrl, setResolvedVideoUrl] = React.useState(null)
   const [videoLoadFailed, setVideoLoadFailed] = React.useState(false)
   const [arrowGuide, setArrowGuide] = React.useState(null)
-  const [videoPaused, setVideoPaused] = React.useState(false)
+  const [videoPaused, setVideoPaused] = React.useState(true)
   const [showArrowOnPause, setShowArrowOnPause] = React.useState(false)
   const [detectionStatus, setDetectionStatus] = React.useState('모델 로딩 중')
   const [detectionResults, setDetectionResults] = React.useState([])
@@ -410,6 +417,18 @@ export function MatchAnalysisPage({ onBack }) {
   })
   const [errorModal, setErrorModal] = React.useState(null)
   const [overlayMode, setOverlayMode] = React.useState(false)
+  const [videoCurrentTime, setVideoCurrentTime] = React.useState(0)
+  const [videoDuration, setVideoDuration] = React.useState(0)
+  const [playFeedback, setPlayFeedback] = React.useState(null)
+  const playFeedbackCountRef = React.useRef(0)
+  const playFeedbackTimerRef = React.useRef(null)
+  const [videoVolume, setVideoVolume] = React.useState(1)
+  const [videoMuted, setVideoMuted] = React.useState(true)
+  const [controlsVisible, setControlsVisible] = React.useState(false)
+  const controlsTimerRef = React.useRef(null)
+  const savedVideoTimeRef = React.useRef(0)
+  const savedVideoWasPausedRef = React.useRef(false)
+  const firstLoadRef = React.useRef(true)
 
   const videoRef = React.useRef(null)
   const tfRef = React.useRef(null)
@@ -885,6 +904,92 @@ export function MatchAnalysisPage({ onBack }) {
     setShowArrowOnPause(false)
   }, [])
   const handleVideoSeeking = React.useCallback(() => setShowArrowOnPause(false), [])
+  const handleTimeUpdate = React.useCallback(() => {
+    const v = videoRef.current
+    if (v) setVideoCurrentTime(v.currentTime)
+  }, [])
+  const handleLoadedMetadata = React.useCallback(() => {
+    syncVideoMetrics()
+    const v = videoRef.current
+    if (!v) return
+    setVideoDuration(v.duration || 0)
+    if (firstLoadRef.current) {
+      firstLoadRef.current = false
+      v.play().catch(() => {})
+    }
+  }, [syncVideoMetrics])
+  const handlePlayPause = React.useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    const willPlay = v.paused
+    if (willPlay) v.play()
+    else v.pause()
+    clearTimeout(playFeedbackTimerRef.current)
+    playFeedbackCountRef.current += 1
+    setPlayFeedback({ type: willPlay ? 'play' : 'pause', id: playFeedbackCountRef.current })
+    playFeedbackTimerRef.current = setTimeout(() => setPlayFeedback(null), 700)
+  }, [])
+  const handleSeek = React.useCallback((e) => {
+    const v = videoRef.current
+    if (!v) return
+    const t = Number(e.target.value)
+    v.currentTime = t
+    setVideoCurrentTime(t)
+  }, [])
+  const handleVolumeChange = React.useCallback((e) => {
+    const v = videoRef.current
+    if (!v) return
+    const vol = Number(e.target.value)
+    v.volume = vol
+    v.muted = vol === 0
+    setVideoVolume(vol)
+    setVideoMuted(vol === 0)
+  }, [])
+  const handleMuteToggle = React.useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    const next = !v.muted
+    v.muted = next
+    setVideoMuted(next)
+  }, [])
+
+  const handlePlayerMouseMove = React.useCallback(() => {
+    setControlsVisible(true)
+    clearTimeout(controlsTimerRef.current)
+    controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 3000)
+  }, [])
+
+  const handlePlayerMouseLeave = React.useCallback(() => {
+    clearTimeout(controlsTimerRef.current)
+    setControlsVisible(false)
+  }, [])
+
+  const enterOverlay = React.useCallback(() => {
+    savedVideoTimeRef.current = videoRef.current?.currentTime || 0
+    savedVideoWasPausedRef.current = videoRef.current?.paused ?? true
+    setOverlayMode(true)
+  }, [])
+
+  const exitOverlay = React.useCallback(() => {
+    savedVideoTimeRef.current = videoRef.current?.currentTime || 0
+    savedVideoWasPausedRef.current = videoRef.current?.paused ?? true
+    setOverlayMode(false)
+  }, [])
+
+  React.useEffect(() => {
+    const t = savedVideoTimeRef.current
+    const wasPaused = savedVideoWasPausedRef.current
+    if (!t && wasPaused) return
+    savedVideoTimeRef.current = 0
+    const v = videoRef.current
+    if (!v) return
+    const restore = () => {
+      if (t) v.currentTime = t
+      if (!wasPaused) v.play().catch(() => {})
+    }
+    if (v.readyState >= 1) restore()
+    else v.addEventListener('loadedmetadata', restore, { once: true })
+  }, [overlayMode])
 
   const aiStatusClass = aiStatus === '완료'
     ? 'status-pill status-pill--complete'
@@ -961,7 +1066,7 @@ export function MatchAnalysisPage({ onBack }) {
         onEditCancel={handleEditCancel}
         onEditSave={handleEditSave}
         onEditStart={handleEditStart}
-        onExitOverlay={() => setOverlayMode(false)}
+        onExitOverlay={exitOverlay}
         onMemoCreate={handleMemoCreate}
         onSelectMemo={handleSelectMemo}
         onVideoError={handleVideoError}
@@ -1053,18 +1158,21 @@ export function MatchAnalysisPage({ onBack }) {
           <div className="video-section__title">
             <span>{matchInfoText}</span>
           </div>
-          <div className="video-player">
+          <div className="video-player" onMouseLeave={handlePlayerMouseLeave} onMouseMove={handlePlayerMouseMove}>
             {isVideoReady ? (
               <video
-                controls
+                muted={videoMuted}
+                onClick={handlePlayPause}
                 onError={handleVideoError}
                 onLoadedData={syncVideoMetrics}
-                onLoadedMetadata={syncVideoMetrics}
+                onLoadedMetadata={handleLoadedMetadata}
                 onPause={handleVideoPause}
                 onPlay={handleVideoPlay}
                 onSeeking={handleVideoSeeking}
+                onTimeUpdate={handleTimeUpdate}
                 ref={videoRef}
                 src={resolvedVideoUrl}
+                style={{ cursor: 'pointer' }}
               />
             ) : (
               <div className="video-player__fallback" role="status">
@@ -1072,6 +1180,14 @@ export function MatchAnalysisPage({ onBack }) {
                 <p>{videoLoadFailed ? '영상 조회 API 응답을 확인한 뒤 다시 시도해주세요.' : '경기 영상 조회 요청을 보내는 중입니다.'}</p>
               </div>
             )}
+            {playFeedback ? (
+              <div className="play-feedback" key={playFeedback.id}>
+                {playFeedback.type === 'play'
+                  ? <svg fill="white" height="36" viewBox="0 0 16 16" width="36"><path d="M3 2l10 6-10 6V2z"/></svg>
+                  : <svg fill="white" height="36" viewBox="0 0 16 16" width="36"><rect height="12" rx="1.5" width="4" x="2" y="2"/><rect height="12" rx="1.5" width="4" x="10" y="2"/></svg>
+                }
+              </div>
+            ) : null}
             {isVideoReady ? (
               <>
                 <canvas className="video-player__inference-buffer" ref={detectionCanvasRef} />
@@ -1133,16 +1249,15 @@ export function MatchAnalysisPage({ onBack }) {
                 <div className="video-player__bbox-control">
                   <button
                     className="video-player__bbox-trigger"
+                    data-active={bboxMenuOpen ? 'true' : undefined}
                     onClick={() => setBboxMenuOpen((prev) => !prev)}
                     type="button"
                   >
-                    <span>bbox</span>
-                    <span
-                      aria-hidden="true"
-                      className={`video-player__bbox-caret ${bboxMenuOpen ? 'is-open' : ''}`}
-                    >
-                      ▾
-                    </span>
+                    <svg fill="none" height="16" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
+                      <rect height="12" rx="1" width="12" x="2" y="2" />
+                      <rect height="6" rx="0.5" width="6" x="5" y="5" />
+                    </svg>
+                    bbox
                   </button>
                   {bboxMenuOpen ? (
                     <div className="video-player__bbox-menu" role="menu">
@@ -1177,6 +1292,47 @@ export function MatchAnalysisPage({ onBack }) {
                 ) : null}
               </>
             ) : null}
+            {isVideoReady ? (
+              <div className="vpc" style={{ opacity: (controlsVisible || videoPaused) ? 1 : 0, pointerEvents: (controlsVisible || videoPaused) ? 'auto' : 'none' }}>
+                <button className="vpc__btn" onClick={handlePlayPause} type="button">
+                  {videoPaused ? (
+                    <svg fill="currentColor" height="14" viewBox="0 0 16 16" width="14"><path d="M3 2l10 6-10 6V2z"/></svg>
+                  ) : (
+                    <svg fill="currentColor" height="14" viewBox="0 0 16 16" width="14"><rect height="12" rx="1" width="4" x="2" y="2"/><rect height="12" rx="1" width="4" x="10" y="2"/></svg>
+                  )}
+                </button>
+                <span className="vpc__time">{formatVideoTime(videoCurrentTime)}</span>
+                <input
+                  className="vpc__seek"
+                  max={videoDuration || 0}
+                  min={0}
+                  onChange={handleSeek}
+                  step={0.1}
+                  type="range"
+                  value={videoCurrentTime}
+                />
+                <span className="vpc__time">{formatVideoTime(videoDuration)}</span>
+                <button className="vpc__btn" onClick={handleMuteToggle} type="button">
+                  {videoMuted || videoVolume === 0 ? (
+                    <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><line x1="13" x2="11" y1="6" y2="8"/><line x1="11" x2="13" y1="6" y2="8"/></svg>
+                  ) : (
+                    <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><path d="M12 5.5a4 4 0 010 5"/></svg>
+                  )}
+                </button>
+                <input
+                  className="vpc__volume"
+                  max={1}
+                  min={0}
+                  onChange={handleVolumeChange}
+                  step={0.05}
+                  type="range"
+                  value={videoMuted ? 0 : videoVolume}
+                />
+                <button className="vpc__btn vpc__btn--fullscreen" onClick={enterOverlay} title="오버레이 모드" type="button">
+                  <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -1185,13 +1341,6 @@ export function MatchAnalysisPage({ onBack }) {
             ← 뒤로 가기
           </button>
           <h1>경기 분석</h1>
-          <button
-            className="overlay-mode-btn"
-            onClick={() => setOverlayMode(true)}
-            type="button"
-          >
-            ⊞ 오버레이 모드
-          </button>
         </div>
 
         <article className="selected-note">

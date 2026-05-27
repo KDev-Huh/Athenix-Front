@@ -1584,6 +1584,106 @@ button {
   font-size: 12px;
 }
 
+/* === Custom Video Player Controls === */
+.vpc {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0) 100%);
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+
+.vpc__btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: #f5f7fa;
+  transition: background 120ms ease;
+}
+.vpc__btn:hover { background: rgba(255,255,255,0.16); }
+
+.vpc__btn--fullscreen { margin-left: auto; }
+
+.vpc__time {
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: rgba(255,255,255,0.75);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.vpc__seek {
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  accent-color: #2ed17f;
+  cursor: pointer;
+}
+
+.vpc__volume {
+  width: 64px;
+  flex: 0 0 auto;
+  height: 3px;
+  accent-color: #2ed17f;
+  cursor: pointer;
+}
+
+/* === Play/Pause Feedback Icon === */
+@keyframes play-feedback-pop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+.play-feedback {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  pointer-events: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: play-feedback-pop 700ms ease forwards;
+}
+
+.play-feedback--overlay {
+  z-index: 35;
+  width: 80px;
+  height: 80px;
+}
+
+.vpc--overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  border-radius: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0) 100%);
+  padding: 24px 16px 12px;
+}
+
 .video-player__bbox-control {
   position: absolute;
   top: 16px;
@@ -1594,15 +1694,28 @@ button {
 .video-player__bbox-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: 1px solid rgba(102, 217, 157, 0.45);
-  background: rgba(5, 10, 8, 0.82);
-  color: #c2f7de;
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
+  gap: 7px;
+  padding: 8px 14px;
+  background: rgba(10, 12, 14, 0.82);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #9aa0a6;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  white-space: nowrap;
   cursor: pointer;
+}
+.video-player__bbox-trigger:hover {
+  color: #c8cdd2;
+  background: rgba(255, 255, 255, 0.10);
+}
+.video-player__bbox-trigger[data-active="true"] {
+  border-color: #2ed17f;
+  color: #9aa0a6;
+  background: rgba(10, 12, 14, 0.82);
 }
 
 .video-player__bbox-caret {
@@ -1646,6 +1759,21 @@ button {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
   width: 100%;
+}
+
+.ov-stage .video-player__bbox-menu {
+  width: 200px;
+  gap: 6px;
+  padding: 12px;
+}
+
+.ov-stage .video-player__bbox-label {
+  font-size: 12px;
+}
+
+.ov-stage .video-player__bbox-select {
+  padding: 7px 10px;
+  font-size: 12px;
 }
 
 .video-player__bbox-select:disabled {
@@ -2087,6 +2215,16 @@ button {
   color: #2ed17f;
   background: rgba(46,209,127,0.08);
 }
+.ov-bbox-wrap .ov-action-pill:hover {
+  color: #c8cdd2;
+  background: rgba(255, 255, 255, 0.10);
+}
+.ov-bbox-wrap .ov-action-pill[data-active="true"] {
+  border-color: #2ed17f;
+  color: #9aa0a6;
+  background: rgba(10, 12, 14, 0.82);
+}
+
 .ov-action-pill__badge {
   min-width: 16px;
   height: 16px;

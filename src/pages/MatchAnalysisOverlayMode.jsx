@@ -56,9 +56,71 @@ export function MatchAnalysisOverlayMode({
   const [aiOpen, setAiOpen] = React.useState(false)
   const [memoOpacity, setMemoOpacity] = React.useState(1)
   const [aiOpacity, setAiOpacity] = React.useState(1)
-  const [aiBubble, setAiBubble] = React.useState(null)
   const [videoCurrentTime, setVideoCurrentTime] = React.useState(0)
+  const [videoDuration, setVideoDuration] = React.useState(0)
+  const [videoVolume, setVideoVolume] = React.useState(1)
+  const [videoMuted, setVideoMuted] = React.useState(false)
   const [videoFit, setVideoFit] = React.useState('contain')
+  const [playFeedback, setPlayFeedback] = React.useState(null)
+  const playFeedbackCountRef = React.useRef(0)
+  const playFeedbackTimerRef = React.useRef(null)
+  const [controlsVisible, setControlsVisible] = React.useState(false)
+  const controlsTimerRef = React.useRef(null)
+
+  const handleStageMouseMove = React.useCallback(() => {
+    setControlsVisible(true)
+    clearTimeout(controlsTimerRef.current)
+    controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 3000)
+  }, [])
+
+  const handleStageMouseLeave = React.useCallback(() => {
+    clearTimeout(controlsTimerRef.current)
+    setControlsVisible(false)
+  }, [])
+
+  React.useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (v.duration) setVideoDuration(v.duration)
+    const onDuration = () => setVideoDuration(videoRef.current?.duration || 0)
+    v.addEventListener('durationchange', onDuration)
+    return () => v.removeEventListener('durationchange', onDuration)
+  }, [])
+
+  const handleOvPlayPause = React.useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    const willPlay = v.paused
+    if (willPlay) v.play()
+    else v.pause()
+    clearTimeout(playFeedbackTimerRef.current)
+    playFeedbackCountRef.current += 1
+    setPlayFeedback({ type: willPlay ? 'play' : 'pause', id: playFeedbackCountRef.current })
+    playFeedbackTimerRef.current = setTimeout(() => setPlayFeedback(null), 700)
+  }, [])
+  const handleOvSeek = React.useCallback((e) => {
+    const v = videoRef.current
+    if (!v) return
+    const t = Number(e.target.value)
+    v.currentTime = t
+    setVideoCurrentTime(t)
+  }, [])
+  const handleOvVolumeChange = React.useCallback((e) => {
+    const v = videoRef.current
+    if (!v) return
+    const vol = Number(e.target.value)
+    v.volume = vol
+    v.muted = vol === 0
+    setVideoVolume(vol)
+    setVideoMuted(vol === 0)
+  }, [])
+  const handleOvMuteToggle = React.useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+    const next = !v.muted
+    v.muted = next
+    setVideoMuted(next)
+  }, [])
 
   const [memoPos, setMemoPos] = React.useState(() => ({ x: Math.max(0, window.innerWidth - 718), y: 68 }))
   const [memoSize, setMemoSize] = React.useState({ w: 340, h: 500 })
@@ -140,6 +202,17 @@ export function MatchAnalysisOverlayMode({
 
   const isVideoReady = Boolean(resolvedVideoUrl) && !videoLoadFailed
 
+  const overlaySvgStyle = videoFit === 'contain' && videoMetrics.width && videoMetrics.height
+    ? {
+        inset: 'auto',
+        width: videoMetrics.width,
+        height: videoMetrics.height,
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+      }
+    : {}
+
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60)
     const s = Math.floor(seconds % 60)
@@ -150,23 +223,19 @@ export function MatchAnalysisOverlayMode({
     ? matchInfoText.split(' · ')
     : [null, matchInfoText]
 
-  const handleVideoClick = React.useCallback((e) => {
-    if (!hasAiFeedback) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    if (e.clientY - rect.top > rect.height - 80) return
-    setAiBubble({ x: e.clientX - rect.left, y: e.clientY - rect.top })
-  }, [hasAiFeedback])
+  const handleVideoClick = React.useCallback(() => {
+    handleOvPlayPause()
+  }, [handleOvPlayPause])
 
   const aiTagStatus = aiStatus === '완료' ? 'done' : aiStatus === '분석 중' ? 'loading' : 'idle'
 
   return (
-    <div className="ov-stage" data-fit={videoFit}>
+    <div className="ov-stage" data-fit={videoFit} onMouseLeave={handleStageMouseLeave} onMouseMove={handleStageMouseMove}>
       <canvas className="ov-inference-canvas" ref={detectionCanvasRef} />
 
       {isVideoReady ? (
         <video
           className="ov-stage__video"
-          controls
           onClick={handleVideoClick}
           onError={onVideoError}
           onLoadedData={syncVideoMetrics}
@@ -188,10 +257,20 @@ export function MatchAnalysisOverlayMode({
 
       <div className="ov-vignette" aria-hidden="true" />
 
+      {playFeedback ? (
+        <div className="play-feedback play-feedback--overlay" key={playFeedback.id}>
+          {playFeedback.type === 'play'
+            ? <svg fill="white" height="48" viewBox="0 0 16 16" width="48"><path d="M3 2l10 6-10 6V2z"/></svg>
+            : <svg fill="white" height="48" viewBox="0 0 16 16" width="48"><rect height="12" rx="1.5" width="4" x="2" y="2"/><rect height="12" rx="1.5" width="4" x="10" y="2"/></svg>
+          }
+        </div>
+      ) : null}
+
       {isVideoReady && bboxEnabled ? (
         <svg
           className="ov-overlay-svg"
           preserveAspectRatio="none"
+          style={overlaySvgStyle}
           viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}
         >
           {mappedDetections.map((box, index) => (
@@ -226,6 +305,7 @@ export function MatchAnalysisOverlayMode({
         <svg
           className="ov-overlay-svg"
           preserveAspectRatio="none"
+          style={overlaySvgStyle}
           viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}
         >
           <defs>
@@ -255,41 +335,6 @@ export function MatchAnalysisOverlayMode({
         </svg>
       ) : null}
 
-      {aiBubble && hasAiFeedback ? (
-        <div
-          className="ov-ai-bubble"
-          style={{ left: aiBubble.x, top: aiBubble.y }}
-        >
-          <div className="ov-ai-bubble__head">
-            <span className="ov-ai-bubble__title">AI 코치 피드백</span>
-            <span className="ov-ai-bubble__tag" data-status={aiTagStatus}>{aiStatus}</span>
-            <button
-              className="ov-ai-bubble__close"
-              onClick={() => setAiBubble(null)}
-              type="button"
-            >
-              ✕
-            </button>
-          </div>
-          <p className="ov-ai-bubble__body">{coachContent.movement}</p>
-          <div className="ov-ai-bubble__actions">
-            <button
-              className="ov-ai-bubble__btn ov-ai-bubble__btn--primary"
-              onClick={() => { onAppendFeedbackMemo(); setAiBubble(null) }}
-              type="button"
-            >
-              메모에 추가
-            </button>
-            <button
-              className="ov-ai-bubble__btn"
-              onClick={() => setAiBubble(null)}
-              type="button"
-            >
-              닫기
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       <div className="ov-topbar">
         <div className="ov-match-pill">
@@ -314,7 +359,7 @@ export function MatchAnalysisOverlayMode({
           <div className="ov-bbox-wrap">
             <button
               className="ov-action-pill"
-              data-active={bboxEnabled ? 'true' : 'false'}
+              data-active={bboxMenuOpen ? 'true' : 'false'}
               onClick={() => setBboxMenuOpen((p) => !p)}
               type="button"
             >
@@ -329,34 +374,30 @@ export function MatchAnalysisOverlayMode({
             </button>
 
             {bboxMenuOpen ? (
-              <div className="ov-bbox-menu">
-                <div className="ov-bbox-menu__field">
-                  <label className="ov-bbox-menu__label" htmlFor="ov-bbox-status">상태</label>
-                  <select
-                    className="ov-bbox-menu__select"
-                    id="ov-bbox-status"
-                    onChange={(e) => setBboxEnabled(e.target.value === 'on')}
-                    value={bboxEnabled ? 'on' : 'off'}
-                  >
-                    <option value="off">비활성화</option>
-                    <option value="on">활성화</option>
-                  </select>
-                </div>
-                <div className="ov-bbox-menu__field">
-                  <label className="ov-bbox-menu__label" htmlFor="ov-bbox-color">색상</label>
-                  <select
-                    className="ov-bbox-menu__select"
-                    disabled={!bboxEnabled}
-                    id="ov-bbox-color"
-                    onChange={(e) => setBboxColorKey(e.target.value)}
-                    value={bboxColorKey}
-                  >
-                    <option value="green">그린</option>
-                    <option value="red">레드</option>
-                    <option value="blue">블루</option>
-                    <option value="yellow">옐로우</option>
-                  </select>
-                </div>
+              <div className="video-player__bbox-menu" role="menu">
+                <label className="video-player__bbox-label" htmlFor="ov-bbox-status">상태</label>
+                <select
+                  className="video-player__bbox-select"
+                  id="ov-bbox-status"
+                  onChange={(e) => setBboxEnabled(e.target.value === 'on')}
+                  value={bboxEnabled ? 'on' : 'off'}
+                >
+                  <option value="off">비활성화</option>
+                  <option value="on">활성화</option>
+                </select>
+                <label className="video-player__bbox-label" htmlFor="ov-bbox-color">색상</label>
+                <select
+                  className="video-player__bbox-select"
+                  disabled={!bboxEnabled}
+                  id="ov-bbox-color"
+                  onChange={(e) => setBboxColorKey(e.target.value)}
+                  value={bboxColorKey}
+                >
+                  <option value="green">그린</option>
+                  <option value="red">레드</option>
+                  <option value="blue">블루</option>
+                  <option value="yellow">옐로우</option>
+                </select>
               </div>
             ) : null}
           </div>
@@ -408,12 +449,6 @@ export function MatchAnalysisOverlayMode({
             <span className="ov-coach-tag" data-status={aiTagStatus}>{aiStatus}</span>
           </button>
 
-          <button className="ov-action-pill" onClick={onExitOverlay} type="button">
-            <svg fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
-              <path d="M5 3H3a1 1 0 00-1 1v8a1 1 0 001 1h2M11 10l3-2-3-2M7 8h7" />
-            </svg>
-            일반 모드
-          </button>
         </div>
       </div>
 
@@ -585,6 +620,48 @@ export function MatchAnalysisOverlayMode({
         </div>
         <div className="ov-drawer__resize" onMouseDown={handleAiResizeStart} />
       </div>
+
+      {isVideoReady ? (
+        <div className="vpc vpc--overlay" style={{ opacity: (controlsVisible || videoPaused) ? 1 : 0, pointerEvents: (controlsVisible || videoPaused) ? 'auto' : 'none' }}>
+          <button className="vpc__btn" onClick={handleOvPlayPause} type="button">
+            {videoPaused ? (
+              <svg fill="currentColor" height="14" viewBox="0 0 16 16" width="14"><path d="M3 2l10 6-10 6V2z"/></svg>
+            ) : (
+              <svg fill="currentColor" height="14" viewBox="0 0 16 16" width="14"><rect height="12" rx="1" width="4" x="2" y="2"/><rect height="12" rx="1" width="4" x="10" y="2"/></svg>
+            )}
+          </button>
+          <span className="vpc__time">{formatTime(videoCurrentTime)}</span>
+          <input
+            className="vpc__seek"
+            max={videoDuration || 0}
+            min={0}
+            onChange={handleOvSeek}
+            step={0.1}
+            type="range"
+            value={videoCurrentTime}
+          />
+          <span className="vpc__time">{formatTime(videoDuration)}</span>
+          <button className="vpc__btn" onClick={handleOvMuteToggle} type="button">
+            {videoMuted || videoVolume === 0 ? (
+              <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><line x1="13" x2="11" y1="6" y2="8"/><line x1="11" x2="13" y1="6" y2="8"/></svg>
+            ) : (
+              <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><path d="M12 5.5a4 4 0 010 5"/></svg>
+            )}
+          </button>
+          <input
+            className="vpc__volume"
+            max={1}
+            min={0}
+            onChange={handleOvVolumeChange}
+            step={0.05}
+            type="range"
+            value={videoMuted ? 0 : videoVolume}
+          />
+          <button className="vpc__btn vpc__btn--fullscreen" onClick={onExitOverlay} title="일반 모드로 돌아가기" type="button">
+            <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M6 2v4H2M10 2v4h4M10 14v-4h4M6 14v-4H2"/></svg>
+          </button>
+        </div>
+      ) : null}
 
       {errorModal ? (
         <div
