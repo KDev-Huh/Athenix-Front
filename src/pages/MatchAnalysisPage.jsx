@@ -747,18 +747,42 @@ export function MatchAnalysisPage({ onBack }) {
   const handleMemoCreate = React.useCallback(async () => {
     if (!memoInput.trim() || !currentMatch?.id) return
 
+    const tempId = `temp-${Date.now()}`
+    const timeMs = getCurrentVideoTimeMs()
+    const clampedMs = Number.isFinite(timeMs) ? Math.max(0, Math.floor(timeMs)) : 0
+    const timeMins = String(Math.floor(clampedMs / 60000)).padStart(2, '0')
+    const timeSecs = String(Math.floor((clampedMs % 60000) / 1000)).padStart(2, '0')
+    const timeLabel = `${timeMins}:${timeSecs}`
+    const optimisticMemo = {
+      id: tempId,
+      matchId: currentMatch.id,
+      timeMs: clampedMs,
+      timeLabel,
+      time: timeLabel,
+      label: '메모',
+      text: memoInput.trim(),
+      createdAt: null,
+      updatedAt: null,
+    }
+
+    setMemos((current) => [optimisticMemo, ...current])
+    dispatchMemoNavigation({ type: 'select', memoId: tempId })
+    setMemoInput('')
+
     try {
       const nextMemo = await addMemo(
-        memoInput.trim(),
+        optimisticMemo.text,
         '메모',
         currentMatch.id,
-        getCurrentVideoTimeMs(),
+        clampedMs,
       )
-      setMemos((current) => [nextMemo, ...current])
+      setMemos((current) =>
+        current.map((m) => (m.id === tempId ? nextMemo : m)),
+      )
       dispatchMemoNavigation({ type: 'select', memoId: nextMemo.id })
-      setMemoInput('')
     } catch {
-      // keep current input on failure
+      setMemos((current) => current.filter((m) => m.id !== tempId))
+      setMemoInput(optimisticMemo.text)
     }
   }, [currentMatch?.id, getCurrentVideoTimeMs, memoInput])
 
