@@ -41,6 +41,22 @@ export function MatchAnalysisListPage({ onNavigate }) {
     }
   }, [queryPage, querySort, queryStatus])
 
+  React.useEffect(() => {
+    const hasProcessing = cards.some((card) => BLOCKED_STATUSES.includes(card.status))
+    if (!hasProcessing) return
+
+    const interval = setInterval(() => {
+      getMatches({ status: queryStatus || undefined, sort: querySort, page: queryPage, size: PAGE_SIZE })
+        .then((nextCards) => {
+          setCards(nextCards)
+          setHasNextPage(nextCards.length >= PAGE_SIZE)
+        })
+        .catch(() => {})
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [cards, queryPage, querySort, queryStatus])
+
   const getStatusClassName = React.useCallback((status) => {
     if (status === '임시 저장') return 'status-pill status-pill--draft'
     if (status === '분석 중' || status === '처리중') return 'status-pill status-pill--processing'

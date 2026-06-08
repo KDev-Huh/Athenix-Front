@@ -2,6 +2,8 @@ import React from 'react'
 import { BrandHeader } from '../components/BrandHeader'
 import { loginUser } from '../lib/appStorage'
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export function LoginPage({ onNavigate }) {
   const [showPassword, setShowPassword] = React.useState(false)
   const [email, setEmail] = React.useState('')
@@ -14,6 +16,11 @@ export function LoginPage({ onNavigate }) {
 
     if (!email.trim() || !password.trim()) {
       setErrorMessage('이메일과 비밀번호를 입력해주세요.')
+      return
+    }
+
+    if (!EMAIL_RE.test(email.trim())) {
+      setErrorMessage('올바른 이메일 형식을 입력해주세요.')
       return
     }
 
@@ -59,7 +66,7 @@ export function LoginPage({ onNavigate }) {
             <p>경기 분석 기록을 이어서 확인하려면 계정으로 들어오세요.</p>
           </div>
 
-          <div className="auth-form">
+          <form className="auth-form" onSubmit={(e) => { e.preventDefault(); handleLogin() }}>
             <label className="auth-field">
               <span>이메일</span>
               <input
@@ -90,8 +97,7 @@ export function LoginPage({ onNavigate }) {
             <button
               className="button button--primary button--block auth-submit"
               disabled={isSubmitting}
-              onClick={handleLogin}
-              type="button"
+              type="submit"
             >
               {isSubmitting ? '로그인 중...' : '로그인'}
             </button>
@@ -113,7 +119,7 @@ export function LoginPage({ onNavigate }) {
             <p className="auth-microcopy">
               분석 결과와 업로드 이력은 계정에 안전하게 보관됩니다.
             </p>
-          </div>
+          </form>
         </div>
       </section>
     </div>

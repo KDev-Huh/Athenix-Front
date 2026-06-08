@@ -436,6 +436,7 @@ export function MatchAnalysisPage({ onBack }) {
   const detectionLoopRef = React.useRef(null)
   const detectionCanvasRef = React.useRef(null)
   const lastDetectionAtRef = React.useRef(0)
+  const suppressMemoSeekRef = React.useRef(false)
 
   const syncVideoMetrics = React.useCallback(() => {
     const videoElement = videoRef.current
@@ -737,6 +738,10 @@ export function MatchAnalysisPage({ onBack }) {
   }, [currentMatch?.id])
 
   React.useEffect(() => {
+    if (suppressMemoSeekRef.current) {
+      suppressMemoSeekRef.current = false
+      return
+    }
     if (!selectedMemoId || !selectedMemo || !videoRef.current) return
 
     const targetMs = getMemoTimeMs(selectedMemo)
@@ -776,6 +781,7 @@ export function MatchAnalysisPage({ onBack }) {
         currentMatch.id,
         clampedMs,
       )
+      suppressMemoSeekRef.current = true
       setMemos((current) =>
         current.map((m) => (m.id === tempId ? nextMemo : m)),
       )

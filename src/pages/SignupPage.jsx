@@ -2,6 +2,8 @@ import React from 'react'
 import { BrandHeader } from '../components/BrandHeader'
 import { loginUser, registerUser } from '../lib/appStorage'
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export function SignupPage({ onNavigate }) {
   const [showPassword, setShowPassword] = React.useState(false)
   const [name, setName] = React.useState('')
@@ -16,6 +18,11 @@ export function SignupPage({ onNavigate }) {
 
     if (!name.trim() || !position.trim() || !email.trim() || !password.trim()) {
       setErrorMessage('모든 항목을 입력해주세요.')
+      return
+    }
+
+    if (!EMAIL_RE.test(email.trim())) {
+      setErrorMessage('올바른 이메일 형식을 입력해주세요.')
       return
     }
 
@@ -74,7 +81,7 @@ export function SignupPage({ onNavigate }) {
             <p>분석 결과를 저장할 기본 계정을 만듭니다.</p>
           </div>
 
-          <div className="auth-form">
+          <form className="auth-form" onSubmit={(e) => { e.preventDefault(); handleSignup() }}>
             <div className="auth-form__row">
               <label className="auth-field">
                 <span>이름</span>
@@ -111,8 +118,7 @@ export function SignupPage({ onNavigate }) {
             <button
               className="button button--primary button--block auth-submit"
               disabled={isSubmitting}
-              onClick={handleSignup}
-              type="button"
+              type="submit"
             >
               {isSubmitting ? '계정 생성 중...' : '계정 만들기'}
             </button>
@@ -134,7 +140,7 @@ export function SignupPage({ onNavigate }) {
             <p className="auth-microcopy">
               분석 결과와 업로드 이력은 계정에 안전하게 보관됩니다.
             </p>
-          </div>
+          </form>
         </div>
       </section>
     </div>

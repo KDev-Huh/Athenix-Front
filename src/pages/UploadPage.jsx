@@ -2,12 +2,12 @@ import React from 'react'
 import { PageFrame } from '../components/PageFrame'
 import { addMatch, saveMatchVideo } from '../lib/appStorage'
 
-function UploadField({ label, value, onChange, placeholder }) {
+function UploadField({ label, value, onChange, placeholder, type = 'text', ...rest }) {
   return (
     <label className="form-field">
       <span>{label}</span>
       <div className="form-field__input">
-        <input className="form-field__control" onChange={onChange} placeholder={placeholder} type="text" value={value} />
+        <input className="form-field__control" onChange={onChange} placeholder={placeholder} type={type} value={value} {...rest} />
       </div>
     </label>
   )
@@ -59,8 +59,25 @@ export function UploadPage({ onNavigate }) {
       return
     }
 
-    if (!form.matchName.trim() || !form.matchDate.trim()) {
-      setErrorMessage('경기 이름과 경기 날짜를 입력해주세요.')
+    if (
+      !form.matchName.trim() ||
+      !form.matchDate.trim() ||
+      !form.opponentName.trim() ||
+      !form.teamName.trim() ||
+      !form.position.trim() ||
+      !form.jerseyNumber.trim()
+    ) {
+      setErrorMessage('설명을 제외한 모든 항목을 입력해주세요.')
+      return
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.matchDate.trim())) {
+      setErrorMessage('경기 날짜는 YYYY-MM-DD 형식으로 입력해주세요. (예: 2026-04-03)')
+      return
+    }
+
+    if (form.jerseyNumber.trim() && !/^\d+$/.test(form.jerseyNumber.trim())) {
+      setErrorMessage('등번호는 숫자만 입력해주세요.')
       return
     }
 
@@ -146,15 +163,19 @@ export function UploadPage({ onNavigate }) {
           </div>
           <div className="upload-form__fields">
             <UploadField label="경기 이름" onChange={updateField('matchName')} placeholder="예: 부산고 vs 서울" value={form.matchName} />
-            <UploadField label="경기 날짜" onChange={updateField('matchDate')} placeholder="2026-04-03" value={form.matchDate} />
+            <UploadField label="경기 날짜" onChange={updateField('matchDate')} placeholder="2026-04-03" type="date" value={form.matchDate} />
             <UploadField label="상대팀 이름" onChange={updateField('opponentName')} placeholder="예: 블루웨이브" value={form.opponentName} />
             <div className="form-row">
               <UploadField label="소속" onChange={updateField('teamName')} placeholder="예: 중원유나이티드" value={form.teamName} />
               <UploadField label="포지션" onChange={updateField('position')} placeholder="중앙" value={form.position} />
             </div>
             <div className="form-row">
-              <UploadField label="등번호" onChange={updateField('jerseyNumber')} placeholder="예: 8" value={form.jerseyNumber} />
+              <div style={{ flex: '0 0 140px' }}>
+                <UploadField label="등번호" min="1" max="99" onChange={updateField('jerseyNumber')} placeholder="예: 8" type="number" value={form.jerseyNumber} />
+              </div>
+              <div style={{ flex: 1 }}>
                 <UploadField label="설명" onChange={updateField('description')} placeholder="예: 1:0 패배" value={form.description} />
+              </div>
             </div>
           </div>
           {errorMessage ? <p className="upload-error">{errorMessage}</p> : null}
