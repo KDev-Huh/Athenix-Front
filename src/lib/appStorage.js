@@ -273,6 +273,10 @@ function normalizeMemo(memo) {
     time: formatTimeToSeconds(memo.time ?? timeLabel),
     label: memo.label ?? '메모',
     text: memo.text ?? '',
+    arrowStartX: memo.arrowStartX != null ? Number(memo.arrowStartX) : null,
+    arrowStartY: memo.arrowStartY != null ? Number(memo.arrowStartY) : null,
+    arrowEndX: memo.arrowEndX != null ? Number(memo.arrowEndX) : null,
+    arrowEndY: memo.arrowEndY != null ? Number(memo.arrowEndY) : null,
     createdAt: memo.createdAt ?? null,
     updatedAt: memo.updatedAt ?? null,
   }
@@ -455,18 +459,27 @@ export async function getMemosByMatch(matchId) {
   return items.map(normalizeMemo).filter(Boolean)
 }
 
-export async function addMemo(text, label = '메모', matchId = null, timeMs = null) {
+export async function addMemo(text, label = '메모', matchId = null, timeMs = null, arrowCoords = null) {
   if (matchId == null || matchId === '') {
     throw new Error('메모를 추가할 경기 정보를 찾을 수 없습니다.')
   }
 
+  const body = {
+    text,
+    timeMs: Number.isFinite(timeMs) ? Math.max(0, Math.floor(timeMs)) : 0,
+    label,
+  }
+
+  if (arrowCoords != null) {
+    body.arrowStartX = arrowCoords.startX
+    body.arrowStartY = arrowCoords.startY
+    body.arrowEndX = arrowCoords.endX
+    body.arrowEndY = arrowCoords.endY
+  }
+
   const data = await request(`/matches/${matchId}/memos`, {
     method: 'POST',
-    body: {
-      text,
-      timeMs: Number.isFinite(timeMs) ? Math.max(0, Math.floor(timeMs)) : 0,
-      label,
-    },
+    body,
     requiresAuth: true,
   })
 

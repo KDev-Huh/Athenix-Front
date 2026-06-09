@@ -429,6 +429,10 @@ export function MatchAnalysisPage({ onBack }) {
   const savedVideoTimeRef = React.useRef(0)
   const savedVideoWasPausedRef = React.useRef(false)
   const firstLoadRef = React.useRef(true)
+  const [memoArrowMode, setMemoArrowMode] = React.useState(false)
+  const [memoArrowStart, setMemoArrowStart] = React.useState(null)
+  const [memoArrowPreview, setMemoArrowPreview] = React.useState(null)
+  const [memoArrowCoords, setMemoArrowCoords] = React.useState(null)
 
   const videoRef = React.useRef(null)
   const tfRef = React.useRef(null)
@@ -758,6 +762,7 @@ export function MatchAnalysisPage({ onBack }) {
     const timeMins = String(Math.floor(clampedMs / 60000)).padStart(2, '0')
     const timeSecs = String(Math.floor((clampedMs % 60000) / 1000)).padStart(2, '0')
     const timeLabel = `${timeMins}:${timeSecs}`
+    const arrowForMemo = memoArrowCoords
     const optimisticMemo = {
       id: tempId,
       matchId: currentMatch.id,
@@ -766,6 +771,10 @@ export function MatchAnalysisPage({ onBack }) {
       time: timeLabel,
       label: '메모',
       text: memoInput.trim(),
+      arrowStartX: arrowForMemo?.startX ?? null,
+      arrowStartY: arrowForMemo?.startY ?? null,
+      arrowEndX: arrowForMemo?.endX ?? null,
+      arrowEndY: arrowForMemo?.endY ?? null,
       createdAt: null,
       updatedAt: null,
     }
@@ -773,6 +782,7 @@ export function MatchAnalysisPage({ onBack }) {
     setMemos((current) => [optimisticMemo, ...current])
     dispatchMemoNavigation({ type: 'select', memoId: tempId })
     setMemoInput('')
+    setMemoArrowCoords(null)
 
     try {
       const nextMemo = await addMemo(
@@ -780,6 +790,7 @@ export function MatchAnalysisPage({ onBack }) {
         '메모',
         currentMatch.id,
         clampedMs,
+        arrowForMemo,
       )
       suppressMemoSeekRef.current = true
       setMemos((current) =>
@@ -789,8 +800,9 @@ export function MatchAnalysisPage({ onBack }) {
     } catch {
       setMemos((current) => current.filter((m) => m.id !== tempId))
       setMemoInput(optimisticMemo.text)
+      setMemoArrowCoords(arrowForMemo)
     }
-  }, [currentMatch?.id, getCurrentVideoTimeMs, memoInput])
+  }, [currentMatch?.id, getCurrentVideoTimeMs, memoArrowCoords, memoInput])
 
   const handleEditStart = React.useCallback((memo) => {
     dispatchMemoNavigation({ type: 'select', memoId: memo.id })
@@ -837,6 +849,52 @@ export function MatchAnalysisPage({ onBack }) {
       // keep current state on failure
     }
   }, [editingMemoId, memos])
+
+  const handleMemoArrowToggle = React.useCallback(() => {
+    if (memoArrowMode || memoArrowCoords) {
+      setMemoArrowMode(false)
+      setMemoArrowStart(null)
+      setMemoArrowPreview(null)
+      setMemoArrowCoords(null)
+    } else {
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause()
+      }
+      setMemoArrowMode(true)
+      setMemoArrowStart(null)
+      setMemoArrowPreview(null)
+    }
+  }, [memoArrowCoords, memoArrowMode])
+
+  const handleVideoClickForArrow = React.useCallback((e) => {
+    if (!memoArrowMode) return
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+
+    if (!memoArrowStart) {
+      setMemoArrowStart({ x, y })
+    } else {
+      setMemoArrowCoords({
+        startX: memoArrowStart.x,
+        startY: memoArrowStart.y,
+        endX: x,
+        endY: y,
+      })
+      setMemoArrowMode(false)
+      setMemoArrowStart(null)
+      setMemoArrowPreview(null)
+    }
+  }, [memoArrowMode, memoArrowStart])
+
+  const handleVideoMouseMoveForArrow = React.useCallback((e) => {
+    if (!memoArrowMode || !memoArrowStart) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+    setMemoArrowPreview({ x, y })
+  }, [memoArrowMode, memoArrowStart])
 
   const handleAiRequest = React.useCallback(async () => {
     if (!currentMatch?.id) return
@@ -888,13 +946,15 @@ export function MatchAnalysisPage({ onBack }) {
 
   const handleSelectMemo = React.useCallback((memo) => {
     const targetMs = getMemoTimeMs(memo)
-    
-    // Always seek to the memo time if valid
+
     if (targetMs != null) {
       seekVideoTo(targetMs)
     }
-    
-    // Track navigation history only if changing memo
+
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause()
+    }
+
     if (videoRef.current && memo.id !== selectedMemoId && targetMs != null) {
       const fromMs = Math.max(0, Math.floor((videoRef.current.currentTime ?? 0) * 1000))
       setSeekHistory((current) => {
@@ -932,6 +992,7 @@ export function MatchAnalysisPage({ onBack }) {
   const handleVideoPlay = React.useCallback(() => {
     setVideoPaused(false)
     setShowArrowOnPause(false)
+    dispatchMemoNavigation({ type: 'reset' })
   }, [])
   const handleVideoSeeking = React.useCallback(() => setShowArrowOnPause(false), [])
   const handleTimeUpdate = React.useCallback(() => {
@@ -1063,6 +1124,54 @@ export function MatchAnalysisPage({ onBack }) {
     }
   }, [mappedArrowGuide])
   const shouldShowArrowOverlay = Boolean(renderedArrowGuide) && showArrowOnPause && videoPaused
+
+  const selectedMemoArrow = React.useMemo(() => {
+    if (!selectedMemo) return null
+    const { arrowStartX, arrowStartY, arrowEndX, arrowEndY } = selectedMemo
+    if (arrowStartX == null || arrowStartY == null || arrowEndX == null || arrowEndY == null) return null
+    const w = videoMetrics.width || 1
+    const h = videoMetrics.height || 1
+    return {
+      startX: arrowStartX * w,
+      startY: arrowStartY * h,
+      endX: arrowEndX * w,
+      endY: arrowEndY * h,
+    }
+  }, [selectedMemo, videoMetrics])
+
+  const renderedMemoArrow = React.useMemo(() => {
+    if (!selectedMemoArrow) return null
+    const dx = selectedMemoArrow.endX - selectedMemoArrow.startX
+    const dy = selectedMemoArrow.endY - selectedMemoArrow.startY
+    const distance = Math.hypot(dx, dy)
+    if (distance < 1) return selectedMemoArrow
+    const trimLength = 6
+    const ratio = Math.max(0, (distance - trimLength) / distance)
+    return {
+      ...selectedMemoArrow,
+      endX: selectedMemoArrow.startX + dx * ratio,
+      endY: selectedMemoArrow.startY + dy * ratio,
+    }
+  }, [selectedMemoArrow])
+
+  const shouldShowMemoArrow = Boolean(renderedMemoArrow) && videoPaused
+
+  const renderedPendingArrow = React.useMemo(() => {
+    if (!memoArrowCoords) return null
+    const w = videoMetrics.width || 1
+    const h = videoMetrics.height || 1
+    const startX = memoArrowCoords.startX * w
+    const startY = memoArrowCoords.startY * h
+    const endX = memoArrowCoords.endX * w
+    const endY = memoArrowCoords.endY * h
+    const dx = endX - startX
+    const dy = endY - startY
+    const distance = Math.hypot(dx, dy)
+    if (distance < 1) return { startX, startY, endX, endY }
+    const trimLength = 6
+    const ratio = Math.max(0, (distance - trimLength) / distance)
+    return { startX, startY, endX: startX + dx * ratio, endY: startY + dy * ratio }
+  }, [memoArrowCoords, videoMetrics])
   const mappedDetections = React.useMemo(
     () => detectionResults
       .map((box) => mapDetectionBoxToVideo(box, videoMetrics))
@@ -1130,6 +1239,17 @@ export function MatchAnalysisPage({ onBack }) {
         setIsRtl={setIsRtl}
         setMemoInput={setMemoInput}
         shouldShowArrowOverlay={shouldShowArrowOverlay}
+        shouldShowMemoArrow={shouldShowMemoArrow}
+        renderedMemoArrow={renderedMemoArrow}
+        renderedPendingArrow={renderedPendingArrow}
+        memoArrowMode={memoArrowMode}
+        memoArrowStart={memoArrowStart}
+        memoArrowPreview={memoArrowPreview}
+        memoArrowCoords={memoArrowCoords}
+        onMemoArrowToggle={handleMemoArrowToggle}
+        onVideoClickForArrow={handleVideoClickForArrow}
+        onVideoMouseMoveForArrow={handleVideoMouseMoveForArrow}
+        onMemoArrowPreviewClear={() => setMemoArrowPreview(null)}
         syncVideoMetrics={syncVideoMetrics}
         videoPaused={videoPaused}
         videoLoadFailed={videoLoadFailed}
@@ -1270,14 +1390,14 @@ export function MatchAnalysisPage({ onBack }) {
                     <defs>
                       <marker
                         id="video-player-arrow-head"
-                        markerHeight="8"
+                        markerHeight="10"
                         markerUnits="userSpaceOnUse"
-                        markerWidth="8"
+                        markerWidth="14"
                         orient="auto"
                         refX="8"
-                        refY="4"
+                        refY="5"
                       >
-                        <path className="video-player__arrow-head" d="M0,0 L8,4 L0,8 z" />
+                        <path className="video-player__arrow-head" d="M0,0 L14,5 L0,10 z" />
                       </marker>
                     </defs>
                     <line
@@ -1289,6 +1409,84 @@ export function MatchAnalysisPage({ onBack }) {
                       y2={renderedArrowGuide.endY}
                     />
                   </svg>
+                ) : null}
+                {shouldShowMemoArrow && renderedMemoArrow ? (
+                  <svg className="video-player__overlay" preserveAspectRatio="none" viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}>
+                    <defs>
+                      <marker id="memo-arrow-head" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="14" orient="auto" refX="8" refY="5">
+                        <path d="M0,0 L14,5 L0,10 z" fill="#7fe3a7" />
+                      </marker>
+                    </defs>
+                    <line
+                      filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                      markerEnd="url(#memo-arrow-head)"
+                      stroke="#7fe3a7"
+                      strokeLinecap="butt"
+                      strokeWidth="2.5"
+                      x1={renderedMemoArrow.startX}
+                      x2={renderedMemoArrow.endX}
+                      y1={renderedMemoArrow.startY}
+                      y2={renderedMemoArrow.endY}
+                    />
+                  </svg>
+                ) : null}
+                {renderedPendingArrow && !memoArrowMode ? (
+                  <svg className="video-player__overlay" preserveAspectRatio="none" viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}>
+                    <defs>
+                      <marker id="pending-arrow-head" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="14" orient="auto" refX="8" refY="5">
+                        <path d="M0,0 L14,5 L0,10 z" fill="#7fe3a7" />
+                      </marker>
+                    </defs>
+                    <line
+                      filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                      markerEnd="url(#pending-arrow-head)"
+                      stroke="#7fe3a7"
+                      strokeLinecap="butt"
+                      strokeWidth="2.5"
+                      x1={renderedPendingArrow.startX}
+                      x2={renderedPendingArrow.endX}
+                      y1={renderedPendingArrow.startY}
+                      y2={renderedPendingArrow.endY}
+                    />
+                  </svg>
+                ) : null}
+                {memoArrowMode && memoArrowStart ? (
+                  <svg className="video-player__overlay" preserveAspectRatio="none" style={{ zIndex: 5, pointerEvents: 'none' }} viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}>
+                    <defs>
+                      <marker id="memo-arrow-preview-head" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="14" orient="auto" refX="8" refY="5">
+                        <path d="M0,0 L14,5 L0,10 z" fill="#7fe3a7" />
+                      </marker>
+                    </defs>
+                    <circle
+                      cx={memoArrowStart.x * (videoMetrics.width || 1)}
+                      cy={memoArrowStart.y * (videoMetrics.height || 1)}
+                      fill="#7fe3a7"
+                      r="5"
+                      stroke="#7fe3a7"
+                      strokeWidth="2"
+                    />
+                    {memoArrowPreview ? (
+                      <line
+                        filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                        markerEnd="url(#memo-arrow-preview-head)"
+                        stroke="#7fe3a7"
+                        strokeLinecap="butt"
+                        strokeWidth="2.5"
+                        x1={memoArrowStart.x * (videoMetrics.width || 1)}
+                        x2={memoArrowPreview.x * (videoMetrics.width || 1)}
+                        y1={memoArrowStart.y * (videoMetrics.height || 1)}
+                        y2={memoArrowPreview.y * (videoMetrics.height || 1)}
+                      />
+                    ) : null}
+                  </svg>
+                ) : null}
+                {memoArrowMode ? (
+                  <div
+                    className="video-player__arrow-capture"
+                    onClick={handleVideoClickForArrow}
+                    onMouseLeave={() => setMemoArrowPreview(null)}
+                    onMouseMove={handleVideoMouseMoveForArrow}
+                  />
                 ) : null}
                 <div className="video-player__bbox-control">
                   <button
@@ -1358,9 +1556,9 @@ export function MatchAnalysisPage({ onBack }) {
                 <span className="vpc__time">{formatVideoTime(videoDuration)}</span>
                 <button className="vpc__btn" onClick={handleMuteToggle} type="button">
                   {videoMuted || videoVolume === 0 ? (
-                    <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><line x1="13" x2="11" y1="6" y2="8"/><line x1="11" x2="13" y1="6" y2="8"/></svg>
+                    <svg fill="none" height="14" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><line x1="13" x2="11" y1="6" y2="8"/><line x1="11" x2="13" y1="6" y2="8"/></svg>
                   ) : (
-                    <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><path d="M12 5.5a4 4 0 010 5"/></svg>
+                    <svg fill="none" height="14" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><path d="M12 5.5a4 4 0 010 5"/></svg>
                   )}
                 </button>
                 <input
@@ -1373,7 +1571,7 @@ export function MatchAnalysisPage({ onBack }) {
                   value={videoMuted ? 0 : videoVolume}
                 />
                 <button className="vpc__btn vpc__btn--fullscreen" onClick={enterOverlay} title="오버레이 모드" type="button">
-                  <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+                  <svg fill="none" height="14" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
                 </button>
               </div>
             ) : null}
@@ -1427,7 +1625,24 @@ export function MatchAnalysisPage({ onBack }) {
             placeholder="여기에 메모를 입력하세요."
             value={memoInput}
           />
-          <button className="button button--primary" onClick={handleMemoCreate} type="button">메모 생성</button>
+          <div className="memo-compose__toolbar">
+            <button
+              className={`button button--small ${memoArrowCoords ? 'button--primary' : 'button--ghost'}`}
+              onClick={handleMemoArrowToggle}
+              type="button"
+            >
+              {memoArrowMode
+                ? (memoArrowStart ? '끝점 클릭' : '시작점 클릭')
+                : memoArrowCoords ? '화살표 제거' : '화살표 추가'}
+            </button>
+            <button className="button button--primary" onClick={handleMemoCreate} type="button">메모 생성</button>
+          </div>
+          {memoArrowMode && !memoArrowStart ? (
+            <p className="memo-compose__hint">영상에서 화살표 시작점을 클릭하세요.</p>
+          ) : null}
+          {memoArrowMode && memoArrowStart ? (
+            <p className="memo-compose__hint">화살표 끝점을 클릭하세요.</p>
+          ) : null}
         </article>
       </section>
 

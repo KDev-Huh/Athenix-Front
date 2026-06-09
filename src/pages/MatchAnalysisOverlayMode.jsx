@@ -47,6 +47,17 @@ export function MatchAnalysisOverlayMode({
   onAppendFeedbackMemo,
   shouldShowArrowOverlay,
   renderedArrowGuide,
+  shouldShowMemoArrow,
+  renderedMemoArrow,
+  renderedPendingArrow,
+  memoArrowMode,
+  memoArrowStart,
+  memoArrowPreview,
+  memoArrowCoords,
+  onMemoArrowToggle,
+  onVideoClickForArrow,
+  onVideoMouseMoveForArrow,
+  onMemoArrowPreviewClear,
   errorModal,
   setErrorModal,
   onBack,
@@ -331,22 +342,22 @@ export function MatchAnalysisOverlayMode({
           <defs>
             <marker
               id="ov-arrowhead"
-              markerHeight="8"
+              markerHeight="10"
               markerUnits="userSpaceOnUse"
-              markerWidth="8"
+              markerWidth="14"
               orient="auto"
               refX="8"
-              refY="4"
+              refY="5"
             >
-              <path d="M0,0 L8,4 L0,8 z" fill="#2ed17f" />
+              <path d="M0,0 L14,5 L0,10 z" fill="#2ed17f" />
             </marker>
           </defs>
           <line
             filter="drop-shadow(0 2px 8px rgba(46,209,127,0.6))"
             markerEnd="url(#ov-arrowhead)"
             stroke="#2ed17f"
-            strokeLinecap="round"
-            strokeWidth="4"
+            strokeLinecap="butt"
+            strokeWidth="3"
             x1={renderedArrowGuide.startX}
             x2={renderedArrowGuide.endX}
             y1={renderedArrowGuide.startY}
@@ -355,11 +366,109 @@ export function MatchAnalysisOverlayMode({
         </svg>
       ) : null}
 
+      {isVideoReady && shouldShowMemoArrow && renderedMemoArrow ? (
+        <svg
+          className="ov-overlay-svg"
+          preserveAspectRatio="none"
+          style={overlaySvgStyle}
+          viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}
+        >
+          <defs>
+            <marker id="ov-memo-arrowhead" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="14" orient="auto" refX="8" refY="5">
+              <path d="M0,0 L14,5 L0,10 z" fill="#2ed17f" />
+            </marker>
+          </defs>
+          <line
+            filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+            markerEnd="url(#ov-memo-arrowhead)"
+            stroke="#2ed17f"
+            strokeLinecap="butt"
+            strokeWidth="3"
+            x1={renderedMemoArrow.startX}
+            x2={renderedMemoArrow.endX}
+            y1={renderedMemoArrow.startY}
+            y2={renderedMemoArrow.endY}
+          />
+        </svg>
+      ) : null}
+
+      {isVideoReady && renderedPendingArrow && !memoArrowMode ? (
+        <svg
+          className="ov-overlay-svg"
+          preserveAspectRatio="none"
+          style={overlaySvgStyle}
+          viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}
+        >
+          <defs>
+            <marker id="ov-pending-arrowhead" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="14" orient="auto" refX="8" refY="5">
+              <path d="M0,0 L14,5 L0,10 z" fill="#2ed17f" />
+            </marker>
+          </defs>
+          <line
+            filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+            markerEnd="url(#ov-pending-arrowhead)"
+            stroke="#2ed17f"
+            strokeLinecap="butt"
+            strokeWidth="3"
+            x1={renderedPendingArrow.startX}
+            x2={renderedPendingArrow.endX}
+            y1={renderedPendingArrow.startY}
+            y2={renderedPendingArrow.endY}
+          />
+        </svg>
+      ) : null}
+
+      {isVideoReady && memoArrowMode && memoArrowStart ? (
+        <svg
+          className="ov-overlay-svg"
+          preserveAspectRatio="none"
+          style={{ ...overlaySvgStyle, zIndex: 5, pointerEvents: 'none' }}
+          viewBox={`0 0 ${videoMetrics.width || 1} ${videoMetrics.height || 1}`}
+        >
+          <defs>
+            <marker id="ov-memo-preview-head" markerHeight="10" markerUnits="userSpaceOnUse" markerWidth="14" orient="auto" refX="8" refY="5">
+              <path d="M0,0 L14,5 L0,10 z" fill="#2ed17f" />
+            </marker>
+          </defs>
+          <circle
+            cx={memoArrowStart.x * (videoMetrics.width || 1)}
+            cy={memoArrowStart.y * (videoMetrics.height || 1)}
+            fill="#2ed17f"
+            r="5"
+            stroke="#2ed17f"
+            strokeWidth="2"
+          />
+          {memoArrowPreview ? (
+            <line
+              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+              markerEnd="url(#ov-memo-preview-head)"
+              stroke="#2ed17f"
+              strokeLinecap="butt"
+              strokeWidth="3"
+              x1={memoArrowStart.x * (videoMetrics.width || 1)}
+              x2={memoArrowPreview.x * (videoMetrics.width || 1)}
+              y1={memoArrowStart.y * (videoMetrics.height || 1)}
+              y2={memoArrowPreview.y * (videoMetrics.height || 1)}
+            />
+          ) : null}
+        </svg>
+      ) : null}
+
+      {isVideoReady && memoArrowMode ? (
+        <div
+          className="ov-arrow-capture"
+          onClick={onVideoClickForArrow}
+          onMouseLeave={onMemoArrowPreviewClear}
+          onMouseMove={onVideoMouseMoveForArrow}
+          style={overlaySvgStyle}
+        />
+      ) : null}
+
 
       <div className="ov-topbar" style={{ zIndex: topbarZ }}>
         <div className="ov-match-pill">
           <button className="ov-match-pill__back" onClick={onBack} type="button">
-            <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 16 16" width="14">
+            <svg fill="none" height="14" stroke="currentColor" strokeLinecap="butt" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 16 16" width="14">
               <path d="M10 4L6 8l4 4" />
             </svg>
           </button>
@@ -429,11 +538,11 @@ export function MatchAnalysisOverlayMode({
             type="button"
           >
             {videoFit === 'contain' ? (
-              <svg fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
+              <svg fill="none" height="16" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
                 <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" />
               </svg>
             ) : (
-              <svg fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
+              <svg fill="none" height="16" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
                 <path d="M6 2v4H2M10 2v4h4M10 14v-4h4M6 14v-4H2" />
               </svg>
             )}
@@ -446,7 +555,7 @@ export function MatchAnalysisOverlayMode({
             onClick={() => setMemoOpen((p) => !p)}
             type="button"
           >
-            <svg fill="none" height="16" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
+            <svg fill="none" height="16" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
               <path d="M3 4h10M3 8h7M3 12h5" />
             </svg>
             메모
@@ -463,7 +572,7 @@ export function MatchAnalysisOverlayMode({
           >
             <svg fill="none" height="16" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16" width="16">
               <circle cx="8" cy="8" r="5" />
-              <path d="M8 5v3l2 1" strokeLinecap="round" />
+              <path d="M8 5v3l2 1" strokeLinecap="butt" />
             </svg>
             AI 코치
             <span className="ov-coach-tag" data-status={aiTagStatus}>{aiStatus}</span>
@@ -547,14 +656,31 @@ export function MatchAnalysisOverlayMode({
             placeholder="여기에 메모를 입력하세요."
             value={memoInput}
           />
-          <button
-            className="ov-memo-compose__submit"
-            disabled={!memoInput.trim()}
-            onClick={onMemoCreate}
-            type="button"
-          >
-            메모 생성
-          </button>
+          <div className="ov-memo-compose__toolbar">
+            <button
+              className={`ov-memo-compose__arrow-btn ${memoArrowCoords ? 'is-active' : ''}`}
+              onClick={onMemoArrowToggle}
+              type="button"
+            >
+              {memoArrowMode
+                ? (memoArrowStart ? '끝점 클릭' : '시작점 클릭')
+                : memoArrowCoords ? '화살표 제거' : '화살표 추가'}
+            </button>
+            <button
+              className="ov-memo-compose__submit"
+              disabled={!memoInput.trim()}
+              onClick={onMemoCreate}
+              type="button"
+            >
+              메모 생성
+            </button>
+          </div>
+          {memoArrowMode && !memoArrowStart ? (
+            <p className="ov-memo-compose__hint">영상에서 화살표 시작점을 클릭하세요.</p>
+          ) : null}
+          {memoArrowMode && memoArrowStart ? (
+            <p className="ov-memo-compose__hint">화살표 끝점을 클릭하세요.</p>
+          ) : null}
         </div>
         <div className="ov-drawer__resize" onMouseDown={handleMemoResizeStart} />
       </div>
@@ -665,9 +791,9 @@ export function MatchAnalysisOverlayMode({
           <span className="vpc__time">{formatTime(videoDuration)}</span>
           <button className="vpc__btn" onClick={handleOvMuteToggle} type="button">
             {videoMuted || videoVolume === 0 ? (
-              <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><line x1="13" x2="11" y1="6" y2="8"/><line x1="11" x2="13" y1="6" y2="8"/></svg>
+              <svg fill="none" height="14" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><line x1="13" x2="11" y1="6" y2="8"/><line x1="11" x2="13" y1="6" y2="8"/></svg>
             ) : (
-              <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><path d="M12 5.5a4 4 0 010 5"/></svg>
+              <svg fill="none" height="14" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M9 3L5 6H2v4h3l4 3V3z"/><path d="M12 5.5a4 4 0 010 5"/></svg>
             )}
           </button>
           <input
@@ -680,7 +806,7 @@ export function MatchAnalysisOverlayMode({
             value={videoMuted ? 0 : videoVolume}
           />
           <button className="vpc__btn vpc__btn--fullscreen" onClick={onExitOverlay} title="일반 모드로 돌아가기" type="button">
-            <svg fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M6 2v4H2M10 2v4h4M10 14v-4h4M6 14v-4H2"/></svg>
+            <svg fill="none" height="14" stroke="currentColor" strokeLinecap="butt" strokeWidth="1.8" viewBox="0 0 16 16" width="14"><path d="M6 2v4H2M10 2v4h4M10 14v-4h4M6 14v-4H2"/></svg>
           </button>
         </div>
       ) : null}
