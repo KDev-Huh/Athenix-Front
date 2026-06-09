@@ -386,6 +386,7 @@ export function MatchAnalysisPage({ onBack }) {
   const [bboxMenuOpen, setBboxMenuOpen] = React.useState(false)
   const [currentMatch, setCurrentMatch] = React.useState(null)
   const [memos, setMemos] = React.useState([])
+  const memoArrowGuidesRef = React.useRef({})
   const [memoNavigation, dispatchMemoNavigation] = React.useReducer(
     memoNavigationReducer,
     memoNavigationInitialState,
@@ -441,6 +442,7 @@ export function MatchAnalysisPage({ onBack }) {
   const detectionCanvasRef = React.useRef(null)
   const lastDetectionAtRef = React.useRef(0)
   const suppressMemoSeekRef = React.useRef(false)
+  const selectedMemoIdRef = React.useRef(null)
 
   const syncVideoMetrics = React.useCallback(() => {
     const videoElement = videoRef.current
@@ -673,6 +675,7 @@ export function MatchAnalysisPage({ onBack }) {
 
   const highlightedMemoId = React.useMemo(() => getHighlightedMemoId(), [])
   const selectedMemoId = memoNavigation.selectedMemoId
+  selectedMemoIdRef.current = selectedMemoId
 
   React.useEffect(() => {
     if (memos.length === 0) {
@@ -756,6 +759,10 @@ export function MatchAnalysisPage({ onBack }) {
   const handleMemoCreate = React.useCallback(async () => {
     if (!memoInput.trim() || !currentMatch?.id) return
 
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause()
+    }
+
     const tempId = `temp-${Date.now()}`
     const timeMs = getCurrentVideoTimeMs()
     const clampedMs = Number.isFinite(timeMs) ? Math.max(0, Math.floor(timeMs)) : 0
@@ -796,7 +803,9 @@ export function MatchAnalysisPage({ onBack }) {
       setMemos((current) =>
         current.map((m) => (m.id === tempId ? nextMemo : m)),
       )
-      dispatchMemoNavigation({ type: 'select', memoId: nextMemo.id })
+      if (selectedMemoIdRef.current === tempId) {
+        dispatchMemoNavigation({ type: 'select', memoId: nextMemo.id })
+      }
     } catch {
       setMemos((current) => current.filter((m) => m.id !== tempId))
       setMemoInput(optimisticMemo.text)
@@ -930,6 +939,9 @@ export function MatchAnalysisPage({ onBack }) {
     try {
       if (lastFeedbackId) {
         const nextMemo = await appendAiFeedbackMemo(currentMatch.id, lastFeedbackId, 'AI 피드백')
+        if (arrowGuide) {
+          memoArrowGuidesRef.current[nextMemo.id] = arrowGuide
+        }
         setMemos((current) => [nextMemo, ...current])
         dispatchMemoNavigation({ type: 'select', memoId: nextMemo.id })
         return
@@ -1129,6 +1141,20 @@ export function MatchAnalysisPage({ onBack }) {
     if (!selectedMemo) return null
     const { arrowStartX, arrowStartY, arrowEndX, arrowEndY } = selectedMemo
     if (arrowStartX == null || arrowStartY == null || arrowEndX == null || arrowEndY == null) return null
+    if (selectedMemo.label === 'AI 피드백') {
+      const cachedGuide = memoArrowGuidesRef.current[selectedMemo.id]
+      if (cachedGuide) {
+        return mapArrowGuideToVideo(cachedGuide, videoMetrics)
+      }
+      const guide = {
+        type: 'normalized',
+        startX: arrowStartX,
+        startY: arrowStartY,
+        endX: arrowEndX,
+        endY: arrowEndY,
+      }
+      return mapArrowGuideToVideo(guide, videoMetrics)
+    }
     const w = videoMetrics.width || 1
     const h = videoMetrics.height || 1
     return {
