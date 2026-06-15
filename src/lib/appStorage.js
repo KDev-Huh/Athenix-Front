@@ -558,6 +558,14 @@ export async function getTodayTip() {
   return request('/tips/today', { requiresAuth: true })
 }
 
+export async function getUserSummary() {
+  try {
+    return await request('/users/me/summary', { requiresAuth: true })
+  } catch {
+    return { totalMatches: null, totalMemos: null, aiAnalysisCount: null }
+  }
+}
+
 export function getPersistentMatchVideoUrl(matchId) {
   if (matchId == null || matchId === '') return Promise.resolve(null)
   return Promise.resolve(`${API_BASE_URL}/matches/${matchId}/video`)
