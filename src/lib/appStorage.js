@@ -277,6 +277,7 @@ function normalizeMemo(memo) {
     arrowStartY: memo.arrowStartY != null ? Number(memo.arrowStartY) : null,
     arrowEndX: memo.arrowEndX != null ? Number(memo.arrowEndX) : null,
     arrowEndY: memo.arrowEndY != null ? Number(memo.arrowEndY) : null,
+    arrowStyle: memo.arrowStyle ?? null,
     createdAt: memo.createdAt ?? null,
     updatedAt: memo.updatedAt ?? null,
   }
@@ -475,6 +476,7 @@ export async function addMemo(text, label = '메모', matchId = null, timeMs = n
     body.arrowStartY = arrowCoords.startY
     body.arrowEndX = arrowCoords.endX
     body.arrowEndY = arrowCoords.endY
+    if (arrowCoords.style != null) body.arrowStyle = arrowCoords.style
   }
 
   const data = await request(`/matches/${matchId}/memos`, {

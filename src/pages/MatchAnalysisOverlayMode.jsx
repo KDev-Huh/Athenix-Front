@@ -1,5 +1,78 @@
 import React from 'react'
 
+const ARROW_STYLES = [
+  {
+    value: 'SOLID',
+    label: '슈팅',
+    icon: (
+      <svg fill="none" height="10" viewBox="0 0 32 10" width="32">
+        <line markerEnd="url(#ov-asi-head)" stroke="currentColor" strokeWidth="2" x1="2" x2="26" y1="5" y2="5" />
+        <defs>
+          <marker id="ov-asi-head" markerHeight="6" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto" refX="5" refY="3">
+            <path d="M0,0 L8,3 L0,6 z" fill="currentColor" />
+          </marker>
+        </defs>
+      </svg>
+    ),
+  },
+  {
+    value: 'DASHED',
+    label: '패스',
+    icon: (
+      <svg fill="none" height="10" viewBox="0 0 32 10" width="32">
+        <line markerEnd="url(#ov-asi-dashed-head)" stroke="currentColor" strokeDasharray="5 3" strokeWidth="2" x1="2" x2="26" y1="5" y2="5" />
+        <defs>
+          <marker id="ov-asi-dashed-head" markerHeight="6" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto" refX="5" refY="3">
+            <path d="M0,0 L8,3 L0,6 z" fill="currentColor" />
+          </marker>
+        </defs>
+      </svg>
+    ),
+  },
+  {
+    value: 'WAVY',
+    label: '드리블',
+    icon: (
+      <svg fill="none" height="10" viewBox="0 0 32 10" width="32">
+        <path d="M2,5 Q6,1 10,5 Q14,9 18,5 Q22,1 26,5" fill="none" markerEnd="url(#ov-asi-wavy-head)" stroke="currentColor" strokeWidth="2" />
+        <defs>
+          <marker id="ov-asi-wavy-head" markerHeight="6" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto" refX="5" refY="3">
+            <path d="M0,0 L8,3 L0,6 z" fill="currentColor" />
+          </marker>
+        </defs>
+      </svg>
+    ),
+  },
+]
+
+function buildWavyPath(x1, y1, x2, y2) {
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const dist = Math.hypot(dx, dy)
+  if (dist < 1) return `M ${x1} ${y1} L ${x2} ${y2}`
+  const ux = dx / dist
+  const uy = dy / dist
+  const px = -uy
+  const py = ux
+  const amp = 13
+  const waveLen = 26
+  const tailLen = 12
+  const waveEndDist = Math.max(0, dist - tailLen)
+  if (waveEndDist < 1) return `M ${x1} ${y1} L ${x2} ${y2}`
+  const numWaves = Math.max(1, Math.round(waveEndDist / waveLen))
+  const segLen = waveEndDist / numWaves
+  let path = `M ${x1} ${y1}`
+  for (let i = 0; i < numWaves; i++) {
+    const side = i % 2 === 0 ? 1 : -1
+    const mx = x1 + ux * (i + 0.5) * segLen + px * amp * side
+    const my = y1 + uy * (i + 0.5) * segLen + py * amp * side
+    const ex = x1 + ux * (i + 1) * segLen
+    const ey = y1 + uy * (i + 1) * segLen
+    path += ` Q ${mx} ${my} ${ex} ${ey}`
+  }
+  path += ` L ${x2} ${y2}`
+  return path
+}
 
 export function MatchAnalysisOverlayMode({
   matchInfoText,
@@ -54,6 +127,8 @@ export function MatchAnalysisOverlayMode({
   memoArrowStart,
   memoArrowPreview,
   memoArrowCoords,
+  memoArrowStyle,
+  onMemoArrowStyleChange,
   onMemoArrowToggle,
   onVideoClickForArrow,
   onVideoMouseMoveForArrow,
@@ -352,17 +427,29 @@ export function MatchAnalysisOverlayMode({
               <path d="M0,0 L14,5 L0,10 z" fill="#2ed17f" />
             </marker>
           </defs>
-          <line
-            filter="drop-shadow(0 2px 8px rgba(46,209,127,0.6))"
-            markerEnd="url(#ov-arrowhead)"
-            stroke="#2ed17f"
-            strokeLinecap="butt"
-            strokeWidth="3"
-            x1={renderedArrowGuide.startX}
-            x2={renderedArrowGuide.endX}
-            y1={renderedArrowGuide.startY}
-            y2={renderedArrowGuide.endY}
-          />
+          {renderedArrowGuide.arrowStyle === 'WAVY' ? (
+            <path
+              d={buildWavyPath(renderedArrowGuide.startX, renderedArrowGuide.startY, renderedArrowGuide.endX, renderedArrowGuide.endY)}
+              fill="none"
+              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.6))"
+              markerEnd="url(#ov-arrowhead)"
+              stroke="#2ed17f"
+              strokeWidth="3"
+            />
+          ) : (
+            <line
+              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.6))"
+              markerEnd="url(#ov-arrowhead)"
+              stroke="#2ed17f"
+              strokeDasharray={renderedArrowGuide.arrowStyle === 'DASHED' ? '8 5' : undefined}
+              strokeLinecap="butt"
+              strokeWidth="3"
+              x1={renderedArrowGuide.startX}
+              x2={renderedArrowGuide.endX}
+              y1={renderedArrowGuide.startY}
+              y2={renderedArrowGuide.endY}
+            />
+          )}
         </svg>
       ) : null}
 
@@ -378,17 +465,29 @@ export function MatchAnalysisOverlayMode({
               <path d="M0,0 L14,5 L0,10 z" fill="#2ed17f" />
             </marker>
           </defs>
-          <line
-            filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
-            markerEnd="url(#ov-memo-arrowhead)"
-            stroke="#2ed17f"
-            strokeLinecap="butt"
-            strokeWidth="3"
-            x1={renderedMemoArrow.startX}
-            x2={renderedMemoArrow.endX}
-            y1={renderedMemoArrow.startY}
-            y2={renderedMemoArrow.endY}
-          />
+          {renderedMemoArrow.arrowStyle === 'WAVY' ? (
+            <path
+              d={buildWavyPath(renderedMemoArrow.startX, renderedMemoArrow.startY, renderedMemoArrow.endX, renderedMemoArrow.endY)}
+              fill="none"
+              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+              markerEnd="url(#ov-memo-arrowhead)"
+              stroke="#2ed17f"
+              strokeWidth="3"
+            />
+          ) : (
+            <line
+              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+              markerEnd="url(#ov-memo-arrowhead)"
+              stroke="#2ed17f"
+              strokeDasharray={renderedMemoArrow.arrowStyle === 'DASHED' ? '8 5' : undefined}
+              strokeLinecap="butt"
+              strokeWidth="3"
+              x1={renderedMemoArrow.startX}
+              x2={renderedMemoArrow.endX}
+              y1={renderedMemoArrow.startY}
+              y2={renderedMemoArrow.endY}
+            />
+          )}
         </svg>
       ) : null}
 
@@ -404,17 +503,29 @@ export function MatchAnalysisOverlayMode({
               <path d="M0,0 L14,5 L0,10 z" fill="#2ed17f" />
             </marker>
           </defs>
-          <line
-            filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
-            markerEnd="url(#ov-pending-arrowhead)"
-            stroke="#2ed17f"
-            strokeLinecap="butt"
-            strokeWidth="3"
-            x1={renderedPendingArrow.startX}
-            x2={renderedPendingArrow.endX}
-            y1={renderedPendingArrow.startY}
-            y2={renderedPendingArrow.endY}
-          />
+          {renderedPendingArrow.arrowStyle === 'WAVY' ? (
+            <path
+              d={buildWavyPath(renderedPendingArrow.startX, renderedPendingArrow.startY, renderedPendingArrow.endX, renderedPendingArrow.endY)}
+              fill="none"
+              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+              markerEnd="url(#ov-pending-arrowhead)"
+              stroke="#2ed17f"
+              strokeWidth="3"
+            />
+          ) : (
+            <line
+              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+              markerEnd="url(#ov-pending-arrowhead)"
+              stroke="#2ed17f"
+              strokeDasharray={renderedPendingArrow.arrowStyle === 'DASHED' ? '8 5' : undefined}
+              strokeLinecap="butt"
+              strokeWidth="3"
+              x1={renderedPendingArrow.startX}
+              x2={renderedPendingArrow.endX}
+              y1={renderedPendingArrow.startY}
+              y2={renderedPendingArrow.endY}
+            />
+          )}
         </svg>
       ) : null}
 
@@ -439,17 +550,34 @@ export function MatchAnalysisOverlayMode({
             strokeWidth="2"
           />
           {memoArrowPreview ? (
-            <line
-              filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
-              markerEnd="url(#ov-memo-preview-head)"
-              stroke="#2ed17f"
-              strokeLinecap="butt"
-              strokeWidth="3"
-              x1={memoArrowStart.x * (videoMetrics.width || 1)}
-              x2={memoArrowPreview.x * (videoMetrics.width || 1)}
-              y1={memoArrowStart.y * (videoMetrics.height || 1)}
-              y2={memoArrowPreview.y * (videoMetrics.height || 1)}
-            />
+            memoArrowStyle === 'WAVY' ? (
+              <path
+                d={buildWavyPath(
+                  memoArrowStart.x * (videoMetrics.width || 1),
+                  memoArrowStart.y * (videoMetrics.height || 1),
+                  memoArrowPreview.x * (videoMetrics.width || 1),
+                  memoArrowPreview.y * (videoMetrics.height || 1),
+                )}
+                fill="none"
+                filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+                markerEnd="url(#ov-memo-preview-head)"
+                stroke="#2ed17f"
+                strokeWidth="3"
+              />
+            ) : (
+              <line
+                filter="drop-shadow(0 2px 8px rgba(46,209,127,0.5))"
+                markerEnd="url(#ov-memo-preview-head)"
+                stroke="#2ed17f"
+                strokeDasharray={memoArrowStyle === 'DASHED' ? '8 5' : undefined}
+                strokeLinecap="butt"
+                strokeWidth="3"
+                x1={memoArrowStart.x * (videoMetrics.width || 1)}
+                x2={memoArrowPreview.x * (videoMetrics.width || 1)}
+                y1={memoArrowStart.y * (videoMetrics.height || 1)}
+                y2={memoArrowPreview.y * (videoMetrics.height || 1)}
+              />
+            )
           ) : null}
         </svg>
       ) : null}
@@ -675,6 +803,21 @@ export function MatchAnalysisOverlayMode({
               메모 생성
             </button>
           </div>
+          {(memoArrowMode || memoArrowCoords) ? (
+            <div className="ov-memo-compose__arrow-styles">
+              {ARROW_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`ov-memo-compose__arrow-style-btn${(memoArrowStyle ?? 'SOLID') === s.value ? ' is-active' : ''}`}
+                  onClick={() => onMemoArrowStyleChange(s.value)}
+                  type="button"
+                >
+                  {s.icon}
+                  <span>{s.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           {memoArrowMode && !memoArrowStart ? (
             <p className="ov-memo-compose__hint">영상에서 화살표 시작점을 클릭하세요.</p>
           ) : null}

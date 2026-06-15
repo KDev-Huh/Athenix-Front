@@ -51,6 +51,51 @@ const BBOX_COLOR_PRESETS = {
   },
 }
 
+const ARROW_STYLES = [
+  {
+    value: 'SOLID',
+    label: '슈팅',
+    icon: (
+      <svg fill="none" height="10" viewBox="0 0 32 10" width="32">
+        <line markerEnd="url(#asi-head)" stroke="currentColor" strokeWidth="2" x1="2" x2="26" y1="5" y2="5" />
+        <defs>
+          <marker id="asi-head" markerHeight="6" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto" refX="5" refY="3">
+            <path d="M0,0 L8,3 L0,6 z" fill="currentColor" />
+          </marker>
+        </defs>
+      </svg>
+    ),
+  },
+  {
+    value: 'DASHED',
+    label: '패스',
+    icon: (
+      <svg fill="none" height="10" viewBox="0 0 32 10" width="32">
+        <line markerEnd="url(#asi-dashed-head)" stroke="currentColor" strokeDasharray="5 3" strokeWidth="2" x1="2" x2="26" y1="5" y2="5" />
+        <defs>
+          <marker id="asi-dashed-head" markerHeight="6" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto" refX="5" refY="3">
+            <path d="M0,0 L8,3 L0,6 z" fill="currentColor" />
+          </marker>
+        </defs>
+      </svg>
+    ),
+  },
+  {
+    value: 'WAVY',
+    label: '드리블',
+    icon: (
+      <svg fill="none" height="10" viewBox="0 0 32 10" width="32">
+        <path d="M2,5 Q6,1 10,5 Q14,9 18,5 Q22,1 26,5" fill="none" markerEnd="url(#asi-wavy-head)" stroke="currentColor" strokeWidth="2" />
+        <defs>
+          <marker id="asi-wavy-head" markerHeight="6" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto" refX="5" refY="3">
+            <path d="M0,0 L8,3 L0,6 z" fill="currentColor" />
+          </marker>
+        </defs>
+      </svg>
+    ),
+  },
+]
+
 function formatVideoTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00'
   const m = Math.floor(seconds / 60)
@@ -199,6 +244,35 @@ function toFiniteNumber(value) {
   return Number.isFinite(num) ? num : null
 }
 
+function buildWavyPath(x1, y1, x2, y2) {
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const dist = Math.hypot(dx, dy)
+  if (dist < 1) return `M ${x1} ${y1} L ${x2} ${y2}`
+  const ux = dx / dist
+  const uy = dy / dist
+  const px = -uy
+  const py = ux
+  const amp = 13
+  const waveLen = 26
+  const tailLen = 12
+  const waveEndDist = Math.max(0, dist - tailLen)
+  if (waveEndDist < 1) return `M ${x1} ${y1} L ${x2} ${y2}`
+  const numWaves = Math.max(1, Math.round(waveEndDist / waveLen))
+  const segLen = waveEndDist / numWaves
+  let path = `M ${x1} ${y1}`
+  for (let i = 0; i < numWaves; i++) {
+    const side = i % 2 === 0 ? 1 : -1
+    const mx = x1 + ux * (i + 0.5) * segLen + px * amp * side
+    const my = y1 + uy * (i + 0.5) * segLen + py * amp * side
+    const ex = x1 + ux * (i + 1) * segLen
+    const ey = y1 + uy * (i + 1) * segLen
+    path += ` Q ${mx} ${my} ${ex} ${ey}`
+  }
+  path += ` L ${x2} ${y2}`
+  return path
+}
+
 function getPointFromPayload(point) {
   if (!point || typeof point !== 'object') return null
   const x = toFiniteNumber(point.x)
@@ -233,6 +307,8 @@ function extractArrowGuide(feedback) {
     && candidate.endY != null
   ))
 
+  const arrowStyle = playGuide?.arrow_style ?? null
+
   if (normalized) {
     return {
       type: 'normalized',
@@ -241,6 +317,7 @@ function extractArrowGuide(feedback) {
       endX: normalized.endX,
       endY: normalized.endY,
       message: playGuide?.message ?? '',
+      arrowStyle,
     }
   }
 
@@ -285,6 +362,7 @@ function extractArrowGuide(feedback) {
         ?? playGuide?.imageHeight,
       ),
       message: playGuide?.message ?? '',
+      arrowStyle,
     }
   }
 
@@ -337,6 +415,7 @@ function mapArrowGuideToVideo(guide, metrics) {
     endX: endX * scale + offsetX,
     endY: endY * scale + offsetY,
     message: guide.message,
+    arrowStyle: guide.arrowStyle ?? null,
   }
 }
 
@@ -434,6 +513,7 @@ export function MatchAnalysisPage({ onBack }) {
   const [memoArrowStart, setMemoArrowStart] = React.useState(null)
   const [memoArrowPreview, setMemoArrowPreview] = React.useState(null)
   const [memoArrowCoords, setMemoArrowCoords] = React.useState(null)
+  const [memoArrowStyle, setMemoArrowStyle] = React.useState('SOLID')
 
   const videoRef = React.useRef(null)
   const tfRef = React.useRef(null)
@@ -770,6 +850,8 @@ export function MatchAnalysisPage({ onBack }) {
     const timeSecs = String(Math.floor((clampedMs % 60000) / 1000)).padStart(2, '0')
     const timeLabel = `${timeMins}:${timeSecs}`
     const arrowForMemo = memoArrowCoords
+      ? { ...memoArrowCoords, style: memoArrowStyle }
+      : null
     const optimisticMemo = {
       id: tempId,
       matchId: currentMatch.id,
@@ -782,6 +864,7 @@ export function MatchAnalysisPage({ onBack }) {
       arrowStartY: arrowForMemo?.startY ?? null,
       arrowEndX: arrowForMemo?.endX ?? null,
       arrowEndY: arrowForMemo?.endY ?? null,
+      arrowStyle: arrowForMemo?.style ?? null,
       createdAt: null,
       updatedAt: null,
     }
@@ -790,6 +873,7 @@ export function MatchAnalysisPage({ onBack }) {
     dispatchMemoNavigation({ type: 'select', memoId: tempId })
     setMemoInput('')
     setMemoArrowCoords(null)
+    setMemoArrowStyle('SOLID')
 
     try {
       const nextMemo = await addMemo(
@@ -811,7 +895,7 @@ export function MatchAnalysisPage({ onBack }) {
       setMemoInput(optimisticMemo.text)
       setMemoArrowCoords(arrowForMemo)
     }
-  }, [currentMatch?.id, getCurrentVideoTimeMs, memoArrowCoords, memoInput])
+  }, [currentMatch?.id, getCurrentVideoTimeMs, memoArrowCoords, memoArrowStyle, memoInput])
 
   const handleEditStart = React.useCallback((memo) => {
     dispatchMemoNavigation({ type: 'select', memoId: memo.id })
@@ -865,6 +949,7 @@ export function MatchAnalysisPage({ onBack }) {
       setMemoArrowStart(null)
       setMemoArrowPreview(null)
       setMemoArrowCoords(null)
+      setMemoArrowStyle('SOLID')
     } else {
       if (videoRef.current && !videoRef.current.paused) {
         videoRef.current.pause()
@@ -1139,21 +1224,18 @@ export function MatchAnalysisPage({ onBack }) {
 
   const selectedMemoArrow = React.useMemo(() => {
     if (!selectedMemo) return null
-    const { arrowStartX, arrowStartY, arrowEndX, arrowEndY } = selectedMemo
+    const { arrowStartX, arrowStartY, arrowEndX, arrowEndY, arrowStyle } = selectedMemo
     if (arrowStartX == null || arrowStartY == null || arrowEndX == null || arrowEndY == null) return null
     if (selectedMemo.label === 'AI 피드백') {
       const cachedGuide = memoArrowGuidesRef.current[selectedMemo.id]
       if (cachedGuide) {
-        return mapArrowGuideToVideo(cachedGuide, videoMetrics)
+        return { ...mapArrowGuideToVideo(cachedGuide, videoMetrics), arrowStyle: arrowStyle ?? cachedGuide.arrowStyle ?? null }
       }
-      const guide = {
-        type: 'normalized',
-        startX: arrowStartX,
-        startY: arrowStartY,
-        endX: arrowEndX,
-        endY: arrowEndY,
-      }
-      return mapArrowGuideToVideo(guide, videoMetrics)
+      const maxVal = Math.max(Math.abs(arrowStartX), Math.abs(arrowStartY), Math.abs(arrowEndX), Math.abs(arrowEndY))
+      const guide = maxVal > 1
+        ? { type: 'pixel', startX: arrowStartX, startY: arrowStartY, endX: arrowEndX, endY: arrowEndY }
+        : { type: 'normalized', startX: arrowStartX, startY: arrowStartY, endX: arrowEndX, endY: arrowEndY }
+      return { ...mapArrowGuideToVideo(guide, videoMetrics), arrowStyle: arrowStyle ?? null }
     }
     const w = videoMetrics.width || 1
     const h = videoMetrics.height || 1
@@ -1162,6 +1244,7 @@ export function MatchAnalysisPage({ onBack }) {
       startY: arrowStartY * h,
       endX: arrowEndX * w,
       endY: arrowEndY * h,
+      arrowStyle: arrowStyle ?? null,
     }
   }, [selectedMemo, videoMetrics])
 
@@ -1193,11 +1276,11 @@ export function MatchAnalysisPage({ onBack }) {
     const dx = endX - startX
     const dy = endY - startY
     const distance = Math.hypot(dx, dy)
-    if (distance < 1) return { startX, startY, endX, endY }
+    if (distance < 1) return { startX, startY, endX, endY, arrowStyle: memoArrowStyle }
     const trimLength = 6
     const ratio = Math.max(0, (distance - trimLength) / distance)
-    return { startX, startY, endX: startX + dx * ratio, endY: startY + dy * ratio }
-  }, [memoArrowCoords, videoMetrics])
+    return { startX, startY, endX: startX + dx * ratio, endY: startY + dy * ratio, arrowStyle: memoArrowStyle }
+  }, [memoArrowCoords, memoArrowStyle, videoMetrics])
   const mappedDetections = React.useMemo(
     () => detectionResults
       .map((box) => mapDetectionBoxToVideo(box, videoMetrics))
@@ -1272,6 +1355,8 @@ export function MatchAnalysisPage({ onBack }) {
         memoArrowStart={memoArrowStart}
         memoArrowPreview={memoArrowPreview}
         memoArrowCoords={memoArrowCoords}
+        memoArrowStyle={memoArrowStyle}
+        onMemoArrowStyleChange={setMemoArrowStyle}
         onMemoArrowToggle={handleMemoArrowToggle}
         onVideoClickForArrow={handleVideoClickForArrow}
         onVideoMouseMoveForArrow={handleVideoMouseMoveForArrow}
@@ -1348,7 +1433,16 @@ export function MatchAnalysisPage({ onBack }) {
           <div className="video-section__title">
             <span>{matchInfoText}</span>
           </div>
-          <div className="video-player" onMouseLeave={handlePlayerMouseLeave} onMouseMove={handlePlayerMouseMove}>
+          <div
+            className="video-player"
+            onMouseLeave={handlePlayerMouseLeave}
+            onMouseMove={handlePlayerMouseMove}
+            style={{
+              aspectRatio: videoMetrics.videoWidth > 0 && videoMetrics.videoHeight > 0
+                ? `${videoMetrics.videoWidth} / ${videoMetrics.videoHeight}`
+                : '16 / 9',
+            }}
+          >
             {isVideoReady ? (
               <video
                 muted={videoMuted}
@@ -1426,14 +1520,24 @@ export function MatchAnalysisPage({ onBack }) {
                         <path className="video-player__arrow-head" d="M0,0 L14,5 L0,10 z" />
                       </marker>
                     </defs>
-                    <line
-                      className="video-player__arrow-line"
-                      markerEnd="url(#video-player-arrow-head)"
-                      x1={renderedArrowGuide.startX}
-                      x2={renderedArrowGuide.endX}
-                      y1={renderedArrowGuide.startY}
-                      y2={renderedArrowGuide.endY}
-                    />
+                    {renderedArrowGuide.arrowStyle === 'WAVY' ? (
+                      <path
+                        className="video-player__arrow-line"
+                        d={buildWavyPath(renderedArrowGuide.startX, renderedArrowGuide.startY, renderedArrowGuide.endX, renderedArrowGuide.endY)}
+                        fill="none"
+                        markerEnd="url(#video-player-arrow-head)"
+                      />
+                    ) : (
+                      <line
+                        className="video-player__arrow-line"
+                        markerEnd="url(#video-player-arrow-head)"
+                        strokeDasharray={renderedArrowGuide.arrowStyle === 'DASHED' ? '8 5' : undefined}
+                        x1={renderedArrowGuide.startX}
+                        x2={renderedArrowGuide.endX}
+                        y1={renderedArrowGuide.startY}
+                        y2={renderedArrowGuide.endY}
+                      />
+                    )}
                   </svg>
                 ) : null}
                 {shouldShowMemoArrow && renderedMemoArrow ? (
@@ -1443,17 +1547,29 @@ export function MatchAnalysisPage({ onBack }) {
                         <path d="M0,0 L14,5 L0,10 z" fill="#7fe3a7" />
                       </marker>
                     </defs>
-                    <line
-                      filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
-                      markerEnd="url(#memo-arrow-head)"
-                      stroke="#7fe3a7"
-                      strokeLinecap="butt"
-                      strokeWidth="2.5"
-                      x1={renderedMemoArrow.startX}
-                      x2={renderedMemoArrow.endX}
-                      y1={renderedMemoArrow.startY}
-                      y2={renderedMemoArrow.endY}
-                    />
+                    {renderedMemoArrow.arrowStyle === 'WAVY' ? (
+                      <path
+                        d={buildWavyPath(renderedMemoArrow.startX, renderedMemoArrow.startY, renderedMemoArrow.endX, renderedMemoArrow.endY)}
+                        fill="none"
+                        filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                        markerEnd="url(#memo-arrow-head)"
+                        stroke="#7fe3a7"
+                        strokeWidth="2.5"
+                      />
+                    ) : (
+                      <line
+                        filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                        markerEnd="url(#memo-arrow-head)"
+                        stroke="#7fe3a7"
+                        strokeDasharray={renderedMemoArrow.arrowStyle === 'DASHED' ? '8 5' : undefined}
+                        strokeLinecap="butt"
+                        strokeWidth="2.5"
+                        x1={renderedMemoArrow.startX}
+                        x2={renderedMemoArrow.endX}
+                        y1={renderedMemoArrow.startY}
+                        y2={renderedMemoArrow.endY}
+                      />
+                    )}
                   </svg>
                 ) : null}
                 {renderedPendingArrow && !memoArrowMode ? (
@@ -1463,17 +1579,29 @@ export function MatchAnalysisPage({ onBack }) {
                         <path d="M0,0 L14,5 L0,10 z" fill="#7fe3a7" />
                       </marker>
                     </defs>
-                    <line
-                      filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
-                      markerEnd="url(#pending-arrow-head)"
-                      stroke="#7fe3a7"
-                      strokeLinecap="butt"
-                      strokeWidth="2.5"
-                      x1={renderedPendingArrow.startX}
-                      x2={renderedPendingArrow.endX}
-                      y1={renderedPendingArrow.startY}
-                      y2={renderedPendingArrow.endY}
-                    />
+                    {renderedPendingArrow.arrowStyle === 'WAVY' ? (
+                      <path
+                        d={buildWavyPath(renderedPendingArrow.startX, renderedPendingArrow.startY, renderedPendingArrow.endX, renderedPendingArrow.endY)}
+                        fill="none"
+                        filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                        markerEnd="url(#pending-arrow-head)"
+                        stroke="#7fe3a7"
+                        strokeWidth="2.5"
+                      />
+                    ) : (
+                      <line
+                        filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                        markerEnd="url(#pending-arrow-head)"
+                        stroke="#7fe3a7"
+                        strokeDasharray={renderedPendingArrow.arrowStyle === 'DASHED' ? '8 5' : undefined}
+                        strokeLinecap="butt"
+                        strokeWidth="2.5"
+                        x1={renderedPendingArrow.startX}
+                        x2={renderedPendingArrow.endX}
+                        y1={renderedPendingArrow.startY}
+                        y2={renderedPendingArrow.endY}
+                      />
+                    )}
                   </svg>
                 ) : null}
                 {memoArrowMode && memoArrowStart ? (
@@ -1492,17 +1620,34 @@ export function MatchAnalysisPage({ onBack }) {
                       strokeWidth="2"
                     />
                     {memoArrowPreview ? (
-                      <line
-                        filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
-                        markerEnd="url(#memo-arrow-preview-head)"
-                        stroke="#7fe3a7"
-                        strokeLinecap="butt"
-                        strokeWidth="2.5"
-                        x1={memoArrowStart.x * (videoMetrics.width || 1)}
-                        x2={memoArrowPreview.x * (videoMetrics.width || 1)}
-                        y1={memoArrowStart.y * (videoMetrics.height || 1)}
-                        y2={memoArrowPreview.y * (videoMetrics.height || 1)}
-                      />
+                      memoArrowStyle === 'WAVY' ? (
+                        <path
+                          d={buildWavyPath(
+                            memoArrowStart.x * (videoMetrics.width || 1),
+                            memoArrowStart.y * (videoMetrics.height || 1),
+                            memoArrowPreview.x * (videoMetrics.width || 1),
+                            memoArrowPreview.y * (videoMetrics.height || 1),
+                          )}
+                          fill="none"
+                          filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                          markerEnd="url(#memo-arrow-preview-head)"
+                          stroke="#7fe3a7"
+                          strokeWidth="2.5"
+                        />
+                      ) : (
+                        <line
+                          filter="drop-shadow(0 0 3px rgba(127,227,167,0.4))"
+                          markerEnd="url(#memo-arrow-preview-head)"
+                          stroke="#7fe3a7"
+                          strokeDasharray={memoArrowStyle === 'DASHED' ? '8 5' : undefined}
+                          strokeLinecap="butt"
+                          strokeWidth="2.5"
+                          x1={memoArrowStart.x * (videoMetrics.width || 1)}
+                          x2={memoArrowPreview.x * (videoMetrics.width || 1)}
+                          y1={memoArrowStart.y * (videoMetrics.height || 1)}
+                          y2={memoArrowPreview.y * (videoMetrics.height || 1)}
+                        />
+                      )
                     ) : null}
                   </svg>
                 ) : null}
@@ -1663,6 +1808,21 @@ export function MatchAnalysisPage({ onBack }) {
             </button>
             <button className="button button--primary" onClick={handleMemoCreate} type="button">메모 생성</button>
           </div>
+          {(memoArrowMode || memoArrowCoords) ? (
+            <div className="memo-compose__arrow-styles">
+              {ARROW_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`memo-compose__arrow-style-btn${memoArrowStyle === s.value ? ' is-active' : ''}`}
+                  onClick={() => setMemoArrowStyle(s.value)}
+                  type="button"
+                >
+                  {s.icon}
+                  <span>{s.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           {memoArrowMode && !memoArrowStart ? (
             <p className="memo-compose__hint">영상에서 화살표 시작점을 클릭하세요.</p>
           ) : null}

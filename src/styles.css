@@ -1368,6 +1368,8 @@ button {
   flex: 1;
   gap: 16px;
   padding: 24px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .analysis-right {
@@ -1489,7 +1491,6 @@ button {
 .video-player {
   position: relative;
   overflow: hidden;
-  height: 360px;
   border-radius: 12px;
   background: #050607;
 }
@@ -1861,6 +1862,40 @@ button {
   font-size: 11px;
   color: #7fe3a7;
   opacity: 0.9;
+}
+
+.memo-compose__arrow-styles {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.memo-compose__arrow-style-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  justify-content: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.05);
+  color: #6a7079;
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.memo-compose__arrow-style-btn:hover {
+  background: rgba(127,227,167,0.10);
+  color: #7fe3a7;
+  border-color: rgba(127,227,167,0.30);
+}
+
+.memo-compose__arrow-style-btn.is-active {
+  background: rgba(127,227,167,0.16);
+  color: #7fe3a7;
+  border-color: rgba(127,227,167,0.50);
 }
 
 .coach-card {
@@ -2750,6 +2785,40 @@ button {
   font-size: 10px;
   color: #7fe3a7;
   opacity: 0.85;
+}
+
+.ov-memo-compose__arrow-styles {
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.ov-memo-compose__arrow-style-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+  padding: 5px 6px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.05);
+  color: #6a7079;
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.ov-memo-compose__arrow-style-btn:hover {
+  background: rgba(46,209,127,0.10);
+  color: #2ed17f;
+  border-color: rgba(46,209,127,0.30);
+}
+
+.ov-memo-compose__arrow-style-btn.is-active {
+  background: rgba(46,209,127,0.15);
+  color: #2ed17f;
+  border-color: rgba(46,209,127,0.50);
 }
 
 .ov-memo-compose__submit {
