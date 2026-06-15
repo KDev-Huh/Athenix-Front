@@ -3615,6 +3615,7 @@ button {
   justify-content: space-between;
   gap: 24px;
   padding: 20px 24px;
+  background: var(--bg);
 }
 
 .hd-greeting__copy {
@@ -3684,12 +3685,12 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
 }
 
 /* ── Generic block ── */
 .hd-block {
-  background: var(--card);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
@@ -3701,8 +3702,8 @@ button {
   justify-content: space-between;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line-soft);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text);
   flex-shrink: 0;
 }
@@ -3847,7 +3848,7 @@ button {
 .hd-standings {
   width: 290px;
   flex-shrink: 0;
-  background: var(--card);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 12px;
   display: flex;
@@ -3861,7 +3862,7 @@ button {
 }
 
 .hd-standings__title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text);
   display: block;
@@ -3898,7 +3899,7 @@ button {
 }
 
 .hd-standings__body {
-  max-height: 400px;
+  max-height: 408px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
